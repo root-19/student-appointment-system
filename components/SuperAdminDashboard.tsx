@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardProps, User, Role, RegistrationRequest } from '../types';
 import { useData } from '../context/DataContext';
-import { Users, Shield, Activity, Settings, Plus, Trash2, Edit, Search, CheckCircle, FileText, Clock, UserPlus, Filter, LayoutDashboard, BarChart2, PieChart as PieChartIcon, Lock, Save, Camera, Mail, Building, User as UserIcon, Eye, EyeOff, Hash, Calendar, BookOpen, XCircle, Check, ArrowUpRight, TrendingUp, ChevronRight, AlertTriangle, Power, Server, Database, Cloud, Wifi, HardDrive, Cpu, AlertOctagon, Target, Award, Upload, Download } from 'lucide-react';
+import { Users, Shield, Settings, Plus, Trash2, Edit, Search, CheckCircle, FileText, Clock, UserPlus, Filter, LayoutDashboard, BarChart2, PieChart as PieChartIcon, Lock, Save, Camera, Mail, Building, User as UserIcon, Eye, EyeOff, Hash, Calendar, BookOpen, XCircle, Check, ArrowUpRight, TrendingUp, ChevronRight, AlertTriangle, Power, AlertOctagon, Target, Award, Upload, Download, Briefcase, Activity, GraduationCap, Layers, Bell, UserX } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Modal, Select, Toast, Pagination } from './UIComponents';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend, LineChart, Line } from 'recharts';
 
 // --- Constants for Dropdowns ---
 const PROGRAM_OPTIONS = [
@@ -23,12 +23,15 @@ const YEAR_LEVELS = ['1st Year', '2nd Year', '3rd Year', '4th Year'];
 
 const SECTION_LETTERS = Array.from({ length: 20 }, (_, i) => String.fromCharCode(65 + i)); // A-T
 
+// Chart Colors
+const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
+
 export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const { users, addUser, updateUser, deleteUser, tickets, pendingRegistrations, approveRegistration, rejectRegistration } = useData();
-  const [view, setView] = useState('home'); // 'home' | 'users' | 'analytics' | 'system' | 'settings'
+  const [view, setView] = useState('home'); // 'home' | 'users' | 'analytics' | 'settings'
   
   // User Management State
-  const [selectedRole, setSelectedRole] = useState<'Student' | 'Registrar' | 'Admin' | 'Pending'>('Student');
+  const [selectedRole, setSelectedRole] = useState<'Student' | 'Staff' | 'Pending' | 'Inactive'>('Student');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -36,6 +39,7 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
   const [filterProgram, setFilterProgram] = useState('All');
   const [filterYearLevel, setFilterYearLevel] = useState('All');
   const [filterSection, setFilterSection] = useState('All');
+  const [filterStaffRole, setFilterStaffRole] = useState('All');
 
   const [newUser, setNewUser] = useState<Partial<User>>({ 
       role: 'Student', 
@@ -55,6 +59,9 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
 
   // Pending Request View State
   const [selectedRequest, setSelectedRequest] = useState<RegistrationRequest | null>(null);
+
+  // Analytics State
+  const [dateRange, setDateRange] = useState('Last 7 Days');
 
   // Settings State
   const [adminProfile, setAdminProfile] = useState({
@@ -77,13 +84,14 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
     setFilterProgram('All');
     setFilterYearLevel('All');
     setFilterSection('All');
+    setFilterStaffRole('All');
     setCurrentPage(1);
   }, [selectedRole]);
 
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterProgram, filterYearLevel, filterSection]);
+  }, [searchTerm, filterProgram, filterYearLevel, filterSection, filterStaffRole]);
 
   // --- Helpers ---
   const getSectionOptions = (yearLevel: string | undefined) => {
@@ -118,15 +126,33 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
   // --- Data Calculations for Analytics ---
 
   // Counts for User Management Cards
-  const studentCount = users.filter(u => u.role === 'Student').length;
-  const registrarCount = users.filter(u => u.role === 'Registrar').length;
-  const adminCount = users.filter(u => u.role === 'Admin').length;
+  const studentCount = users.filter(u => u.role === 'Student' && u.status === 'Active').length;
+  // Staff includes Registrar, Admin, and Academic
+  const staffCount = users.filter(u => ['Registrar', 'Admin', 'Academic'].includes(u.role) && u.status === 'Active').length;
+  // Inactive count
+  const inactiveCount = users.filter(u => u.status === 'Inactive').length;
+  
+  // Pending count (separate data source)
   const pendingCount = pendingRegistrations.length;
 
   // Filter users for table based on selectedRole
   const filteredUsers = users.filter(u => {
-    // Only show users matching the selected role (excluding SuperAdmin from these lists)
-    const matchesRole = u.role === selectedRole;
+    let matchesRole = false;
+    let matchesStatus = u.status === 'Active'; // Default to active for standard roles
+    
+    if (selectedRole === 'Student') {
+        matchesRole = u.role === 'Student';
+        matchesStatus = u.status === 'Active';
+    } else if (selectedRole === 'Staff') {
+        matchesRole = ['Registrar', 'Admin', 'Academic'].includes(u.role);
+        matchesStatus = u.status === 'Active';
+    } else if (selectedRole === 'Inactive') {
+        matchesRole = true; // All roles
+        matchesStatus = u.status === 'Inactive';
+    } else if (selectedRole === 'Pending') {
+        // This view uses pendingRegistrations, not users array
+        return true; 
+    }
     
     // Search logic
     const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -136,13 +162,25 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
     // Filter Logic
     const matchesProgram = filterProgram === 'All' || u.program === filterProgram;
     const matchesYearLevel = filterYearLevel === 'All' || u.yearLevel === filterYearLevel;
-    const matchesSection = filterSection === 'All' || (u.section && u.section.includes(filterSection)); // Loose match for section filter
+    const matchesSection = filterSection === 'All' || (u.section && u.section.includes(filterSection));
+    
+    // Staff Role Filter
+    const matchesStaffRole = filterStaffRole === 'All' || u.role === filterStaffRole;
 
     if (selectedRole === 'Student') {
-        return matchesRole && matchesSearch && matchesProgram && matchesYearLevel && matchesSection;
+        return matchesRole && matchesStatus && matchesSearch && matchesProgram && matchesYearLevel && matchesSection;
     }
 
-    return matchesRole && matchesSearch;
+    if (selectedRole === 'Staff') {
+        return matchesRole && matchesStatus && matchesSearch && matchesStaffRole;
+    }
+
+    if (selectedRole === 'Inactive') {
+        return matchesRole && matchesStatus && matchesSearch;
+    }
+
+    // Default Fallback
+    return matchesRole && matchesStatus && matchesSearch;
   });
 
   // Pagination Calculation
@@ -165,38 +203,100 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
       { name: 'Rejected', value: statusCounts['Rejected'] || 0, color: '#ef4444' }, // Red
   ].filter(d => d.value > 0);
 
-  // 2. Category Breakdown
-  const categoryCounts = tickets.reduce((acc: Record<string, number>, t) => {
-    acc[t.category] = (acc[t.category] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // 2. Department Performance (Bar Chart)
+  const departmentStats = ['Registrar', 'Administrative', 'Academic'].map(category => {
+      const catTickets = tickets.filter(t => t.category === category);
+      return {
+          name: category,
+          Total: catTickets.length,
+          Resolved: catTickets.filter(t => t.status === 'Resolved').length,
+          Pending: catTickets.filter(t => t.status === 'Pending').length
+      };
+  });
 
-  const CATEGORY_DATA = [
-    { name: 'Registrar', value: categoryCounts['Registrar'] || 0, color: '#8b5cf6' }, // Purple
-    { name: 'Administrative', value: categoryCounts['Administrative'] || 0, color: '#0ea5e9' }, // Sky Blue
-  ].filter(d => d.value > 0);
+  // 3. Program Distribution (Donut)
+  const programCounts = users
+    .filter(u => u.role === 'Student' && u.program)
+    .reduce((acc: Record<string, number>, u) => {
+        acc[u.program!] = (acc[u.program!] || 0) + 1;
+        return acc;
+    }, {});
+    
+  const PROGRAM_DATA = Object.keys(programCounts).map((prog, index) => ({
+      name: prog,
+      value: programCounts[prog],
+      color: COLORS[index % COLORS.length]
+  }));
 
-  // 3. User Activity (Top Students)
-  const studentActivity = tickets.reduce((acc: Record<string, number>, t) => {
-    acc[t.studentName] = (acc[t.studentName] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  // Dynamic Volume Data based on selected range
+  const getVolumeData = (range: string) => {
+    switch(range) {
+        case 'Last 30 Days':
+            return [
+                { name: 'Week 1', tickets: 45, resolved: 40 },
+                { name: 'Week 2', tickets: 52, resolved: 48 },
+                { name: 'Week 3', tickets: 38, resolved: 30 },
+                { name: 'Week 4', tickets: 60, resolved: 55 },
+            ];
+        case 'Last 90 Days':
+             return [
+                { name: 'Aug', tickets: 180, resolved: 160 },
+                { name: 'Sep', tickets: 210, resolved: 195 },
+                { name: 'Oct', tickets: 195, resolved: 180 },
+            ];
+        case 'This Year':
+             return [
+                { name: 'Jan', tickets: 120, resolved: 100 },
+                { name: 'Feb', tickets: 145, resolved: 130 },
+                { name: 'Mar', tickets: 160, resolved: 140 },
+                { name: 'Apr', tickets: 135, resolved: 125 },
+                { name: 'May', tickets: 190, resolved: 180 },
+                { name: 'Jun', tickets: 170, resolved: 160 },
+                { name: 'Jul', tickets: 150, resolved: 140 },
+                { name: 'Aug', tickets: 180, resolved: 160 },
+            ];
+        case 'Last 7 Days':
+        default:
+            return [
+                { name: 'Mon', tickets: 12, resolved: 10 },
+                { name: 'Tue', tickets: 19, resolved: 15 },
+                { name: 'Wed', tickets: 15, resolved: 12 },
+                { name: 'Thu', tickets: 22, resolved: 18 },
+                { name: 'Fri', tickets: 30, resolved: 25 },
+                { name: 'Sat', tickets: 10, resolved: 8 },
+                { name: 'Sun', tickets: 5, resolved: 3 },
+            ];
+    }
+  };
 
-  const TICKET_VOLUME_DATA = [
-    { name: 'Mon', tickets: 12, resolved: 10 },
-    { name: 'Tue', tickets: 19, resolved: 15 },
-    { name: 'Wed', tickets: 15, resolved: 12 },
-    { name: 'Thu', tickets: 22, resolved: 18 },
-    { name: 'Fri', tickets: 30, resolved: 25 },
-    { name: 'Sat', tickets: 10, resolved: 8 },
-    { name: 'Sun', tickets: 5, resolved: 3 },
-  ];
+  const currentVolumeData = getVolumeData(dateRange);
 
-  // System Health Mock Data
-  const ACTIVITY_LOGS = [
-    ...tickets.slice(0, 3).map(t => ({ id: t.id, type: 'Ticket', message: `New ticket created by ${t.studentName}`, time: 'Just now' })),
-    ...users.slice(0, 2).map(u => ({ id: u.id, type: 'User', message: `User ${u.name} logged in`, time: '5 mins ago' })),
-  ];
+  // 4. Combined Recent Activity Feed (Tickets + Registrations)
+  const activityFeed = [
+    ...tickets.map(t => ({
+        id: t.id,
+        type: 'Ticket',
+        title: t.title,
+        subtitle: t.status === 'Pending' ? `New ${t.category} Ticket` : `Status updated to ${t.status}`,
+        user: t.studentName,
+        date: t.lastUpdated || t.submittedDate,
+        status: t.status
+    })),
+    ...pendingRegistrations.map(r => ({
+        id: r.id,
+        type: 'Registration',
+        title: 'New Account Request',
+        subtitle: `${r.program} - ${r.yearLevel}`,
+        user: r.name,
+        date: r.dateSubmitted,
+        status: 'Pending'
+    }))
+  ].sort((a, b) => {
+      // Simple date parsing for sorting
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return isNaN(dateB) || isNaN(dateA) ? 0 : dateB - dateA;
+  }).slice(0, 6);
 
   // --- Handlers ---
 
@@ -306,6 +406,34 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
     }
   };
 
+  const handleExport = () => {
+    // 1. Define CSV headers
+    const headers = ['Period', 'Total Tickets', 'Resolved Tickets'];
+    
+    // 2. Map data to CSV rows
+    const rows = currentVolumeData.map(item => [item.name, item.tickets, item.resolved]);
+    
+    // 3. Combine headers and rows
+    const csvContent = [
+        headers.join(','), 
+        ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    // 4. Create Blob
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // 5. Create download link and click
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `analytics_report_${dateRange.replace(/\s+/g, '_').toLowerCase()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    setToast({ message: "Analytics report exported successfully.", type: 'success' });
+  };
+
   const NavItem = ({ id, label, icon: Icon, badgeCount }: any) => (
       <button 
         onClick={() => setView(id)} 
@@ -363,7 +491,6 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
             <NavItem id="home" label="Dashboard" icon={LayoutDashboard} />
             <NavItem id="users" label="User Management" icon={Users} badgeCount={pendingRegistrations.length} />
             <NavItem id="analytics" label="Analytics" icon={BarChart2} />
-            <NavItem id="system" label="System Health" icon={Activity} />
             <NavItem id="settings" label="Settings" icon={Settings} />
         </nav>
 
@@ -432,7 +559,7 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                     </div>
 
                     {/* Quick Stats Row - Redesigned */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                         {/* Users Card */}
                         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
                             <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform"></div>
@@ -485,22 +612,61 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                                 <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">New Requests</p>
                             </div>
                         </div>
+                    </div>
 
-                        {/* System Status Card */}
-                        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition-all">
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-50 rounded-full -mr-10 -mt-10 group-hover:scale-110 transition-transform"></div>
-                            <div className="relative z-10">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl shadow-sm border border-emerald-100">
-                                        <Activity className="h-6 w-6" />
-                                    </div>
-                                    <span className="flex items-center text-xs font-bold text-slate-500 bg-slate-50 px-2 py-1 rounded-full">
-                                        100% Uptime
-                                    </span>
-                                </div>
-                                <h3 className="text-3xl font-bold text-emerald-600 mb-1">Healthy</h3>
-                                <p className="text-sm font-semibold text-slate-500 uppercase tracking-wide">System Status</p>
-                            </div>
+                    {/* System Live Feed (Recent Activity) */}
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                             <div>
+                                 <h3 className="text-lg font-bold text-slate-900">System Live Feed</h3>
+                                 <p className="text-sm text-slate-500">Real-time updates across the platform.</p>
+                             </div>
+                             <Activity className="h-5 w-5 text-slate-400" />
+                        </div>
+                        <div className="p-0">
+                             {activityFeed.map((item, index) => (
+                                 <div key={item.id} className={`flex items-start p-4 hover:bg-slate-50 transition-colors ${index !== activityFeed.length - 1 ? 'border-b border-slate-50' : ''}`}>
+                                      <div className={`mt-1 h-10 w-10 rounded-full flex items-center justify-center border-2 shadow-sm flex-shrink-0 ${
+                                          item.type === 'Registration' ? 'bg-purple-50 border-purple-100 text-purple-600' :
+                                          item.status === 'Pending' ? 'bg-amber-50 border-amber-100 text-amber-600' :
+                                          item.status === 'Resolved' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
+                                          'bg-blue-50 border-blue-100 text-blue-600'
+                                      }`}>
+                                          {item.type === 'Registration' ? <UserPlus className="h-5 w-5" /> :
+                                           item.status === 'Resolved' ? <CheckCircle className="h-5 w-5" /> : 
+                                           item.status === 'Pending' ? <Clock className="h-5 w-5" /> : 
+                                           <Activity className="h-5 w-5" />}
+                                      </div>
+                                      <div className="ml-4 flex-1">
+                                          <div className="flex justify-between items-start">
+                                              <p className="text-sm font-medium text-slate-900">
+                                                  <span className="font-bold">{item.user}</span> 
+                                                  <span className="text-slate-500 font-normal"> - {item.subtitle}</span>
+                                              </p>
+                                              <span className="text-xs text-slate-400 whitespace-nowrap ml-2">{item.date}</span>
+                                          </div>
+                                          <p className="text-xs text-slate-500 mt-1 line-clamp-1">{item.title}</p>
+                                          <div className="flex items-center gap-2 mt-2">
+                                              <Badge className="text-[10px] px-2 py-0.5" variant={item.status === 'Resolved' ? 'success' : item.status === 'In Progress' ? 'info' : 'warning'}>
+                                                  {item.status}
+                                              </Badge>
+                                              <span className="text-[10px] text-slate-400 px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200 font-mono">
+                                                  {item.type} • {item.id}
+                                              </span>
+                                          </div>
+                                      </div>
+                                 </div>
+                             ))}
+                             {activityFeed.length === 0 && (
+                                 <div className="p-8 text-center text-slate-500">
+                                     No recent activity to display.
+                                 </div>
+                             )}
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+                            <Button variant="ghost" onClick={() => setView('analytics')} className="text-emerald-600 hover:text-emerald-700 text-sm font-bold">
+                                View Detailed Reports &rarr;
+                            </Button>
                         </div>
                     </div>
                 </>
@@ -521,7 +687,7 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                     </div>
 
                     {/* Role Cards Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <RoleCard 
                             role="Student" 
                             label="Students" 
@@ -533,34 +699,24 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                             onClick={() => setSelectedRole('Student')}
                         />
                         <RoleCard 
-                            role="Registrar" 
-                            label="Registrar Staff" 
-                            count={registrarCount} 
-                            icon={Users} 
-                            colorClass="bg-gradient-to-br from-teal-400 to-teal-600"
+                            role="Staff" 
+                            label="Staff Members" 
+                            count={staffCount} 
+                            icon={Briefcase} 
+                            colorClass="bg-gradient-to-br from-indigo-400 to-indigo-600"
                             iconBgClass="bg-white/20"
-                            isSelected={selectedRole === 'Registrar'}
-                            onClick={() => setSelectedRole('Registrar')}
+                            isSelected={selectedRole === 'Staff'}
+                            onClick={() => setSelectedRole('Staff')}
                         />
                         <RoleCard 
-                            role="Admin" 
-                            label="Administrative" 
-                            count={adminCount} 
-                            icon={Building} 
-                            colorClass="bg-gradient-to-br from-pink-400 to-pink-600"
+                            role="Inactive" 
+                            label="Inactive Users" 
+                            count={inactiveCount} 
+                            icon={UserX} 
+                            colorClass="bg-gradient-to-br from-slate-500 to-slate-700"
                             iconBgClass="bg-white/20"
-                            isSelected={selectedRole === 'Admin'}
-                            onClick={() => setSelectedRole('Admin')}
-                        />
-                        <RoleCard 
-                            role="Pending" 
-                            label="Pending Accounts" 
-                            count={pendingCount} 
-                            icon={Clock} 
-                            colorClass="bg-gradient-to-br from-purple-400 to-purple-600"
-                            iconBgClass="bg-white/20"
-                            isSelected={selectedRole === 'Pending'}
-                            onClick={() => setSelectedRole('Pending')}
+                            isSelected={selectedRole === 'Inactive'}
+                            onClick={() => setSelectedRole('Inactive')}
                         />
                     </div>
 
@@ -615,11 +771,29 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                                             </Select>
                                         </div>
                                     )}
+
+                                    {/* Filters - For Staff */}
+                                    {selectedRole === 'Staff' && (
+                                         <Select 
+                                            value={filterStaffRole} 
+                                            onChange={(e) => setFilterStaffRole(e.target.value)}
+                                            className="h-11 rounded-xl text-sm border-slate-200 min-w-[150px]"
+                                        >
+                                            <option value="All">All Roles</option>
+                                            <option value="Registrar">Registrar</option>
+                                            <option value="Admin">Administrative</option>
+                                            <option value="Academic">Academic</option>
+                                        </Select>
+                                    )}
                                 </div>
                             </div>
                             <div className="text-sm text-slate-500">
                                 {selectedRole === 'Pending' 
                                     ? 'Review and approve new account registrations.' 
+                                    : selectedRole === 'Staff'
+                                    ? 'Manage all active staff (Registrar, Admin, Academic) accounts.'
+                                    : selectedRole === 'Inactive'
+                                    ? 'View and manage deactivated user accounts.'
                                     : `Manage all active ${selectedRole.toLowerCase()} accounts.`}
                             </div>
                         </div>
@@ -758,16 +932,114 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
 
             {/* Analytics View */}
             {view === 'analytics' && (
-                 <div className="space-y-8">
-                    <h1 className="text-2xl font-bold text-slate-900">Analytics & Reports</h1>
+                 <div className="space-y-8 pb-10">
+                    <div className="flex items-center justify-between">
+                         <div>
+                            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">System Analytics</h1>
+                            <p className="text-slate-500 mt-1">Deep insights into system performance and user engagement.</p>
+                         </div>
+                         <div className="flex space-x-2">
+                             <Select 
+                                value={dateRange}
+                                onChange={(e) => setDateRange(e.target.value)}
+                                className="h-10 w-40 text-sm bg-white border-slate-200 rounded-lg shadow-sm"
+                             >
+                                 <option>Last 7 Days</option>
+                                 <option>Last 30 Days</option>
+                                 <option>Last 90 Days</option>
+                                 <option>This Year</option>
+                             </Select>
+                             <Button onClick={handleExport} variant="outline" className="border-slate-200 text-slate-600 hover:bg-slate-50">
+                                 <Download className="h-4 w-4 mr-2" /> Export
+                             </Button>
+                         </div>
+                    </div>
                     
-                    {/* Top Row Charts */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                         <Card className="shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
-                            <CardHeader>
-                                <CardTitle>Ticket Status Distribution</CardTitle>
+                    {/* Executive Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <Card className="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Total Users</p>
+                                    <h3 className="text-3xl font-bold text-slate-900 mt-2">{users.length}</h3>
+                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mt-2 inline-block">+12 this month</span>
+                                </div>
+                                <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                                    <Users className="h-6 w-6" />
+                                </div>
+                            </div>
+                        </Card>
+                        <Card className="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Active Tickets</p>
+                                    <h3 className="text-3xl font-bold text-slate-900 mt-2">{tickets.filter(t => t.status !== 'Resolved').length}</h3>
+                                    <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full mt-2 inline-block">High Volume</span>
+                                </div>
+                                <div className="p-3 bg-orange-50 text-orange-600 rounded-xl">
+                                    <Activity className="h-6 w-6" />
+                                </div>
+                            </div>
+                        </Card>
+                         <Card className="bg-white shadow-sm border border-slate-200 rounded-2xl p-6">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Resolution Rate</p>
+                                    <h3 className="text-3xl font-bold text-slate-900 mt-2">
+                                        {Math.round((tickets.filter(t => t.status === 'Resolved').length / tickets.length) * 100) || 0}%
+                                    </h3>
+                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full mt-2 inline-block">Very Efficient</span>
+                                </div>
+                                <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
+                                    <CheckCircle className="h-6 w-6" />
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+
+                    {/* Main Charts Row */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                         {/* Ticket Volume Trends */}
+                         <Card className="shadow-sm border border-slate-200 rounded-2xl overflow-hidden lg:col-span-2">
+                            <CardHeader className="flex flex-row items-center justify-between pb-2 bg-white border-b border-slate-100">
+                                <div>
+                                    <CardTitle>Traffic & Volume Trends</CardTitle>
+                                    <p className="text-xs text-slate-500 mt-1">Daily ticket submissions and user activity.</p>
+                                </div>
+                                <Select className="h-8 w-32 text-xs bg-slate-50 border-none rounded-lg">
+                                    <option>Tickets</option>
+                                    <option>Users</option>
+                                </Select>
                             </CardHeader>
-                            <CardContent className="h-[300px]">
+                            <CardContent className="h-[350px] p-4 pt-6">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={currentVolumeData}>
+                                        <defs>
+                                            <linearGradient id="colorTickets" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} dy={10} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                                        <Tooltip 
+                                            cursor={{ stroke: '#8b5cf6', strokeWidth: 1 }}
+                                            contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
+                                        />
+                                        <Area type="monotone" dataKey="tickets" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorTickets)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                         </Card>
+
+                         {/* Status Distribution */}
+                         <Card className="shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                            <CardHeader className="bg-white border-b border-slate-100">
+                                <CardTitle>Current Status Mix</CardTitle>
+                                <p className="text-xs text-slate-500 mt-1">Breakdown of all tickets by current status.</p>
+                            </CardHeader>
+                            <CardContent className="h-[350px] p-4">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <PieChart>
                                         <Pie
@@ -783,122 +1055,79 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                                                 <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={0} />
                                             ))}
                                         </Pie>
-                                        <Tooltip />
-                                        <Legend verticalAlign="bottom" height={36} />
+                                        <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} />
+                                        <Legend verticalAlign="bottom" height={36} iconType="circle" />
                                     </PieChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                         </Card>
-
-                         <Card className="shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
-                            <CardHeader>
-                                <CardTitle>Ticket Volume by Category</CardTitle>
-                            </CardHeader>
-                            <CardContent className="h-[300px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={CATEGORY_DATA} layout="vertical">
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                        <XAxis type="number" hide />
-                                        <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} />
-                                        <Tooltip cursor={{fill: 'transparent'}} />
-                                        <Bar dataKey="value" fill="#8884d8" radius={[0, 4, 4, 0]}>
-                                            {CATEGORY_DATA.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.color} />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
                                 </ResponsiveContainer>
                             </CardContent>
                          </Card>
                     </div>
 
-                    {/* Bottom Row - Trend */}
-                    <Card className="shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
-                        <CardHeader>
-                            <CardTitle>Weekly Ticket Volume Trend</CardTitle>
-                        </CardHeader>
-                        <CardContent className="h-[300px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={TICKET_VOLUME_DATA}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                                    <Tooltip />
-                                    <Area type="monotone" dataKey="tickets" stroke="#3b82f6" fillOpacity={1} fill="url(#colorTickets)" />
-                                    <defs>
-                                        <linearGradient id="colorTickets" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1}/>
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                                        </linearGradient>
-                                    </defs>
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                 </div>
-            )}
+                    {/* Secondary Metrics Row */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                         {/* Department Efficiency */}
+                         <Card className="shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                             <CardHeader className="bg-white border-b border-slate-100">
+                                 <CardTitle>Department Efficiency</CardTitle>
+                                 <p className="text-xs text-slate-500 mt-1">Comparison of resolved vs. pending tickets per department.</p>
+                             </CardHeader>
+                             <CardContent className="h-[300px] p-4 pt-6">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={departmentStats} barGap={0} barSize={20}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                                        <Tooltip 
+                                            cursor={{fill: '#f8fafc'}}
+                                            contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}}
+                                        />
+                                        <Bar dataKey="Resolved" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Pending" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                        <Legend />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                             </CardContent>
+                         </Card>
 
-            {/* System View */}
-            {view === 'system' && (
-                 <div className="space-y-8">
-                     <h1 className="text-2xl font-bold text-slate-900">System Health</h1>
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <Card className="bg-emerald-50 border-emerald-100 text-emerald-900">
-                             <CardContent className="p-6">
-                                 <div className="flex items-center justify-between mb-4">
-                                     <Server className="h-6 w-6" />
-                                     <span className="text-xs font-bold uppercase tracking-wider bg-emerald-100 px-2 py-1 rounded">Healthy</span>
-                                 </div>
-                                 <h3 className="text-2xl font-bold">99.9%</h3>
-                                 <p className="text-sm opacity-80">Server Uptime</p>
+                         {/* Student Demographics */}
+                         <Card className="shadow-sm border border-slate-200 rounded-2xl overflow-hidden">
+                             <CardHeader className="bg-white border-b border-slate-100">
+                                 <CardTitle>Student Demographics (By Program)</CardTitle>
+                                 <p className="text-xs text-slate-500 mt-1">Distribution of enrolled students across programs.</p>
+                             </CardHeader>
+                             <CardContent className="h-[300px] p-4">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={PROGRAM_DATA}
+                                            cx="50%"
+                                            cy="50%"
+                                            outerRadius={100}
+                                            dataKey="value"
+                                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                                                const RADIAN = Math.PI / 180;
+                                                const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                                const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                                return percent > 0.1 ? (
+                                                    <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize={10} fontWeight="bold">
+                                                        {`${(percent * 100).toFixed(0)}%`}
+                                                    </text>
+                                                ) : null;
+                                            }}
+                                            labelLine={false}
+                                        >
+                                            {PROGRAM_DATA.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} strokeWidth={2} stroke="white" />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)'}} />
+                                        <Legend layout="vertical" align="right" verticalAlign="middle" />
+                                    </PieChart>
+                                </ResponsiveContainer>
                              </CardContent>
-                        </Card>
-                        <Card className="bg-blue-50 border-blue-100 text-blue-900">
-                             <CardContent className="p-6">
-                                 <div className="flex items-center justify-between mb-4">
-                                     <Database className="h-6 w-6" />
-                                     <span className="text-xs font-bold uppercase tracking-wider bg-blue-100 px-2 py-1 rounded">Optimal</span>
-                                 </div>
-                                 <h3 className="text-2xl font-bold">24ms</h3>
-                                 <p className="text-sm opacity-80">Database Latency</p>
-                             </CardContent>
-                        </Card>
-                        <Card className="bg-purple-50 border-purple-100 text-purple-900">
-                             <CardContent className="p-6">
-                                 <div className="flex items-center justify-between mb-4">
-                                     <Cloud className="h-6 w-6" />
-                                     <span className="text-xs font-bold uppercase tracking-wider bg-purple-100 px-2 py-1 rounded">Synced</span>
-                                 </div>
-                                 <h3 className="text-2xl font-bold">1.2 GB</h3>
-                                 <p className="text-sm opacity-80">Storage Used</p>
-                             </CardContent>
-                        </Card>
-                        <Card className="bg-amber-50 border-amber-100 text-amber-900">
-                             <CardContent className="p-6">
-                                 <div className="flex items-center justify-between mb-4">
-                                     <Cpu className="h-6 w-6" />
-                                     <span className="text-xs font-bold uppercase tracking-wider bg-amber-100 px-2 py-1 rounded">Low Load</span>
-                                 </div>
-                                 <h3 className="text-2xl font-bold">12%</h3>
-                                 <p className="text-sm opacity-80">CPU Usage</p>
-                             </CardContent>
-                        </Card>
-                     </div>
-
-                     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-                         <h3 className="text-lg font-bold text-slate-900 mb-4">Recent Activity Logs</h3>
-                         <div className="space-y-4">
-                             {ACTIVITY_LOGS.map((log, i) => (
-                                 <div key={i} className="flex items-start pb-4 border-b border-slate-100 last:border-0 last:pb-0">
-                                     <div className={`mt-1 h-2 w-2 rounded-full ${log.type === 'Error' ? 'bg-red-500' : 'bg-emerald-500'} mr-4`}></div>
-                                     <div className="flex-1">
-                                         <p className="text-sm text-slate-800 font-medium">{log.message}</p>
-                                         <p className="text-xs text-slate-400 mt-0.5">{log.time} • {log.type}</p>
-                                     </div>
-                                 </div>
-                             ))}
-                         </div>
-                     </div>
+                         </Card>
+                    </div>
                  </div>
             )}
 
@@ -1236,11 +1465,13 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                                         <option value="Student">Student</option>
                                         <option value="Registrar">Registrar Staff</option>
                                         <option value="Admin">Administrator</option>
+                                        <option value="Academic">Academic Staff</option>
                                     </Select>
                                 </div>
                                 <p className="text-xs text-slate-500 mt-2 ml-1">
                                     {newUser.role === 'Student' ? 'Can submit tickets and view own records.' : 
                                      newUser.role === 'Registrar' ? 'Can manage registrar tickets and student records.' : 
+                                     newUser.role === 'Academic' ? 'Can manage academic tickets.' :
                                      'Can manage administrative tickets and facilities.'}
                                 </p>
                             </div>

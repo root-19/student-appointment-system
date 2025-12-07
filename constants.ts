@@ -5,9 +5,9 @@ export const MOCK_USERS: User[] = [
   // Students (Format: 1st 2 letters of firstname + lastname @ptc.edu.ph, Password: lastname12345)
   { id: 'u1', name: 'Juan Dela Cruz', email: 'judelacruz@ptc.edu.ph', password: 'delacruz12345', role: 'Student', program: 'BSIT', section: '3A', studentId: '2023-1001', yearLevel: '3rd Year' },
   { id: 'u5', name: 'Johnmark Junio', email: 'jojunio@ptc.edu.ph', password: 'junio12345', role: 'Student', program: 'BSIT', section: '1A', studentId: '2024-1001', yearLevel: '1st Year' },
-  { id: 'u6', name: 'Jockey Jorge', email: 'jojorge@ptc.edu.ph', password: 'jorge12345', role: 'Student', program: 'BSCS', section: '2B', studentId: '2024-1002', yearLevel: '2nd Year' },
+  { id: 'u6', name: 'Jockey Jorge', email: 'jojorge@ptc.edu.ph', password: 'jorge12345', role: 'Student', program: 'CCS', section: '2B', studentId: '2024-1002', yearLevel: '2nd Year' },
   { id: 'u7', name: 'Faisah Macaraguit', email: 'famacaraguit@ptc.edu.ph', password: 'macaraguit12345', role: 'Student', program: 'BSIT', section: '3C', studentId: '2024-1003', yearLevel: '3rd Year' },
-  { id: 'u8', name: 'Hakim Maulay', email: 'hamaulay@ptc.edu.ph', password: 'maulay12345', role: 'Student', program: 'BSCS', section: '1A', studentId: '2024-1004', yearLevel: '1st Year' },
+  { id: 'u8', name: 'Hakim Maulay', email: 'hamaulay@ptc.edu.ph', password: 'maulay12345', role: 'Student', program: 'CCS', section: '1A', studentId: '2024-1004', yearLevel: '1st Year' },
   { id: 'u9', name: 'Jonas Nollora', email: 'jonollora@ptc.edu.ph', password: 'nollora12345', role: 'Student', program: 'BSIT', section: '4A', studentId: '2024-1005', yearLevel: '4th Year' },
   { id: 'u10', name: 'Ryle Angelo Verdejo', email: 'ryverdejo@ptc.edu.ph', password: 'verdejo12345', role: 'Student', program: 'BSIT', section: '2A', studentId: '2024-1006', yearLevel: '2nd Year' },
 
