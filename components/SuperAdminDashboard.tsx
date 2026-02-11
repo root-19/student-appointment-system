@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { DashboardProps, User, Role, RegistrationRequest } from '../types';
+import { DashboardProps, User, Role, RegistrationRequest, Ticket } from '../types';
 import { useData } from '../context/DataContext';
-import { Users, Shield, Settings, Plus, Trash2, Edit, Search, CheckCircle, FileText, Clock, UserPlus, Filter, LayoutDashboard, BarChart2, PieChart as PieChartIcon, Lock, Save, Camera, Mail, Building, User as UserIcon, Eye, EyeOff, Hash, Calendar, BookOpen, XCircle, Check, ArrowUpRight, TrendingUp, ChevronRight, AlertTriangle, Power, AlertOctagon, Target, Award, Upload, Download, Briefcase, Activity, GraduationCap, Layers, Bell, UserX } from 'lucide-react';
+import { ticketAPI } from '../services/api';
+import { Users, Shield, Settings, Plus, Trash2, Edit, Search, CheckCircle, FileText, Clock, UserPlus, Filter, LayoutDashboard, BarChart2, PieChart as PieChartIcon, Lock, Save, Camera, Mail, Building, User as UserIcon, Eye, EyeOff, Hash, Calendar, BookOpen, XCircle, Check, ArrowUpRight, TrendingUp, ChevronRight, AlertTriangle, Power, AlertOctagon, Target, Award, Upload, Download, Briefcase, Activity, GraduationCap, Layers, Bell, UserX, MessageSquare, Paperclip } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Modal, Select, Toast, Pagination } from './UIComponents';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend, LineChart, Line } from 'recharts';
+import Logo from '../assets/logo.jpg';
 
 // --- Constants for Dropdowns ---
 const PROGRAM_OPTIONS = [
@@ -27,7 +29,7 @@ const SECTION_LETTERS = Array.from({ length: 20 }, (_, i) => String.fromCharCode
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
 
 export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
-  const { users, addUser, updateUser, deleteUser, tickets, pendingRegistrations, approveRegistration, rejectRegistration } = useData();
+  const { users, addUser, updateUser, deleteUser, tickets, pendingRegistrations, approveRegistration, rejectRegistration, refreshData } = useData();
   const [view, setView] = useState('home'); // 'home' | 'users' | 'analytics' | 'settings'
   
   // User Management State
@@ -56,6 +58,7 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isEditingUser, setIsEditingUser] = useState(false);
   const [editUserData, setEditUserData] = useState<Partial<User>>({});
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
   // Pending Request View State
   const [selectedRequest, setSelectedRequest] = useState<RegistrationRequest | null>(null);
@@ -300,20 +303,70 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
 
   // --- Handlers ---
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newUser.name && newUser.email && newUser.role) {
-        addUser(newUser as Omit<User, 'id'>);
-        setIsAddModalOpen(false);
-        setNewUser({ role: 'Student', program: 'BSIT', yearLevel: '1st Year', section: '1A' });
-        setToast({ message: "User added successfully.", type: 'success' });
+    if (!newUser.name || !newUser.email || !newUser.role) {
+      setToast({ message: "Please fill in all required fields.", type: 'error' });
+      return;
+    }
+
+    try {
+      // Generate a default password if not provided
+      const defaultPassword = 'password123'; // You can make this more secure
+      
+      // Prepare user data with password
+      const userData: Omit<User, 'id'> = {
+        name: newUser.name!,
+        email: newUser.email!,
+        password: defaultPassword, // Will be hashed on backend
+        role: newUser.role!,
+        department: newUser.department,
+        program: newUser.program,
+        yearLevel: newUser.yearLevel,
+        section: newUser.section,
+        studentId: newUser.studentId,
+        status: newUser.status || 'Active',
+      };
+
+      await addUser(userData);
+      
+      // Refresh users list
+      await refreshData();
+      
+      setIsAddModalOpen(false);
+      setNewUser({ role: 'Student', program: 'BSIT', yearLevel: '1st Year', section: '1A' });
+      setToast({ message: "User added successfully.", type: 'success' });
+    } catch (error: any) {
+      console.error('Error adding user:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to add user. Please try again.';
+      setToast({ message: errorMessage, type: 'error' });
     }
   };
 
   const handleViewUser = (user: User) => {
-    setSelectedUser(user);
-    setEditUserData(user);
-    setIsEditingUser(false);
+    try {
+      setSelectedUser(user);
+      setEditUserData({
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        department: user.department,
+        program: user.program,
+        yearLevel: user.yearLevel,
+        section: user.section,
+        studentId: user.studentId,
+        status: user.status,
+      });
+      setIsEditingUser(false);
+    } catch (error) {
+      console.error('Error viewing user:', error);
+      setToast({ message: 'Error loading user details', type: 'error' });
+    }
+  };
+
+  // Get tickets for a specific user
+  const getUserTickets = (userId: string) => {
+    return tickets.filter(t => String(t.submittedBy) === String(userId));
   };
 
   const handleSaveUser = () => {
@@ -379,17 +432,29 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
       }, 1000);
   };
 
-  const handleApprove = (id: string) => {
-      approveRegistration(id);
-      if (selectedRequest?.id === id) setSelectedRequest(null);
-      setToast({ message: "Registration approved.", type: 'success' });
+  const handleApprove = async (id: string) => {
+      try {
+          await approveRegistration(id);
+          if (selectedRequest?.id === id) setSelectedRequest(null);
+          setToast({ message: "Registration approved.", type: 'success' });
+          await refreshData(); // Refresh data after approval
+      } catch (error: any) {
+          console.error('Error approving registration:', error);
+          setToast({ message: error.response?.data?.message || 'Failed to approve registration', type: 'error' });
+      }
   }
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
       if(confirm("Are you sure you want to reject this registration?")) {
-          rejectRegistration(id);
-          if (selectedRequest?.id === id) setSelectedRequest(null);
-          setToast({ message: "Registration rejected.", type: 'info' });
+          try {
+              await rejectRegistration(id);
+              if (selectedRequest?.id === id) setSelectedRequest(null);
+              setToast({ message: "Registration rejected.", type: 'info' });
+              await refreshData(); // Refresh data after rejection
+          } catch (error: any) {
+              console.error('Error rejecting registration:', error);
+              setToast({ message: error.response?.data?.message || 'Failed to reject registration', type: 'error' });
+          }
       }
   }
 
@@ -479,7 +544,7 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
       <aside className="w-72 bg-slate-900 text-white flex flex-col shadow-2xl z-20">
         <div className="p-8 flex items-center space-x-3 border-b border-slate-800/50">
             <div className="h-10 w-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-900/50">
-                <Shield className="text-white h-6 w-6" />
+                <UserIcon className="text-white h-6 w-6" />
             </div>
             <div>
                 <span className="font-bold text-xl block leading-none tracking-tight">SuperAdmin</span>
@@ -1312,19 +1377,19 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                 title="Application Details"
                 maxWidth="max-w-3xl"
             >
-                {selectedRequest && (
+                {selectedRequest ? (
                     <div className="space-y-8">
                         {/* Top Profile Section */}
                         <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 flex flex-col items-center justify-center text-center relative overflow-hidden">
                              <div className="h-24 w-24 rounded-full bg-white border-4 border-emerald-100 flex items-center justify-center text-4xl font-bold text-emerald-600 mb-4 shadow-sm z-10">
-                                {selectedRequest.name.charAt(0)}
+                                {selectedRequest.name?.charAt(0) || '?'}
                             </div>
                             <div className="z-10">
                                 <div className="flex items-center justify-center gap-2 mb-1">
-                                    <h3 className="text-2xl font-bold text-slate-900">{selectedRequest.name}</h3>
-                                     <Badge className="bg-orange-100 text-orange-700 border-orange-200">Pending</Badge>
+                                    <h3 className="text-2xl font-bold text-slate-900">{selectedRequest.name || 'N/A'}</h3>
+                                     <Badge className="bg-orange-100 text-orange-700 border-orange-200">{selectedRequest.status || 'Pending'}</Badge>
                                 </div>
-                                <p className="text-slate-500 mb-3">{selectedRequest.email}</p>
+                                <p className="text-slate-500 mb-3">{selectedRequest.email || 'N/A'}</p>
                                 <Badge variant="default" className="bg-white border-slate-200 text-slate-700 px-3 py-1">Student</Badge>
                             </div>
                             {/* Decorative background */}
@@ -1340,22 +1405,22 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                                         <Hash className="h-5 w-5 text-slate-400 mt-0.5" />
                                         <div>
                                             <p className="text-sm font-bold text-slate-700">Student ID</p>
-                                            <p className="text-base text-slate-900 font-mono">{selectedRequest.studentId}</p>
+                                            <p className="text-base text-slate-900 font-mono">{selectedRequest.studentId || 'N/A'}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-start gap-3">
                                         <BookOpen className="h-5 w-5 text-slate-400 mt-0.5" />
                                         <div>
                                             <p className="text-sm font-bold text-slate-700">Program / Year / Section</p>
-                                            <p className="text-base text-slate-900 font-bold">{selectedRequest.program}</p>
-                                            <p className="text-sm text-slate-500">{selectedRequest.yearLevel} - Section {selectedRequest.section}</p>
+                                            <p className="text-base text-slate-900 font-bold">{selectedRequest.program || 'N/A'}</p>
+                                            <p className="text-sm text-slate-500">{selectedRequest.yearLevel || 'N/A'} - Section {selectedRequest.section || 'N/A'}</p>
                                         </div>
                                     </div>
                                      <div className="flex items-start gap-3">
                                         <Calendar className="h-5 w-5 text-slate-400 mt-0.5" />
                                         <div>
                                             <p className="text-sm font-bold text-slate-700">Date Applied</p>
-                                            <p className="text-base text-slate-900">{selectedRequest.dateSubmitted}</p>
+                                            <p className="text-base text-slate-900">{selectedRequest.dateSubmitted || 'N/A'}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1364,43 +1429,55 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                             {/* Documents */}
                             <div>
                                 <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 border-b border-slate-100 pb-2">Documents</h4>
-                                <div 
-                                    className="border border-emerald-200 bg-emerald-50/50 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:bg-emerald-50 transition-colors group"
-                                    onClick={() => handleDownloadDocument(selectedRequest)}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2 bg-white rounded-lg border border-emerald-100 shadow-sm text-red-500">
-                                            <FileText className="h-6 w-6" />
+                                {selectedRequest.documentName || selectedRequest.documentUrl ? (
+                                    <div 
+                                        className="border border-emerald-200 bg-emerald-50/50 rounded-xl p-4 flex items-center justify-between cursor-pointer hover:bg-emerald-50 transition-colors group"
+                                        onClick={() => selectedRequest && handleDownloadDocument(selectedRequest)}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-white rounded-lg border border-emerald-100 shadow-sm text-red-500">
+                                                <FileText className="h-6 w-6" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-slate-900 text-sm">{selectedRequest.documentName || 'Document'}</p>
+                                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Verification Doc</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-bold text-slate-900 text-sm">{selectedRequest.documentName}</p>
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide">Verification Doc</p>
+                                        <div className="text-emerald-600 opacity-60 group-hover:opacity-100">
+                                            <Eye className="h-5 w-5" />
                                         </div>
                                     </div>
-                                    <div className="text-emerald-600 opacity-60 group-hover:opacity-100">
-                                        <Eye className="h-5 w-5" />
+                                ) : (
+                                    <div className="border border-slate-200 bg-slate-50 rounded-xl p-4 text-center text-slate-500">
+                                        <p className="text-sm">No document available</p>
                                     </div>
-                                </div>
+                                )}
                                 <p className="text-xs text-center text-slate-400 mt-2">* Click to download/preview document</p>
                             </div>
                         </div>
 
                         {/* Footer Actions */}
-                        <div className="flex gap-4 pt-6 border-t border-slate-100">
-                            <Button 
-                                variant="outline" 
-                                className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 h-12 font-bold"
-                                onClick={() => handleReject(selectedRequest.id)}
-                            >
-                                <XCircle className="h-5 w-5 mr-2" /> Reject Application
-                            </Button>
-                            <Button 
-                                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 h-12 font-bold"
-                                onClick={() => handleApprove(selectedRequest.id)}
-                            >
-                                <Check className="h-5 w-5 mr-2" /> Approve & Create Account
-                            </Button>
-                        </div>
+                        {selectedRequest.status === 'Pending' && (
+                            <div className="flex gap-4 pt-6 border-t border-slate-100">
+                                <Button 
+                                    variant="outline" 
+                                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 h-12 font-bold"
+                                    onClick={() => selectedRequest && handleReject(selectedRequest.id)}
+                                >
+                                    <XCircle className="h-5 w-5 mr-2" /> Reject Application
+                                </Button>
+                                <Button 
+                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 h-12 font-bold"
+                                    onClick={() => selectedRequest && handleApprove(selectedRequest.id)}
+                                >
+                                    <Check className="h-5 w-5 mr-2" /> Approve & Create Account
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-slate-500">
+                        <p>Loading request details...</p>
                     </div>
                 )}
             </Modal>
@@ -1561,18 +1638,18 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                 title="User Details"
                 maxWidth="max-w-3xl"
             >
-                {selectedUser && (
+                {selectedUser ? (
                     <div className="space-y-6">
                         <div className="flex items-center space-x-4 pb-4 border-b border-slate-100">
                              <div className="h-16 w-16 bg-slate-200 rounded-full flex items-center justify-center text-2xl font-bold text-slate-500 overflow-hidden">
-                                 {selectedUser.avatar ? <img src={selectedUser.avatar} alt="Avatar" className="w-full h-full object-cover" /> : selectedUser.name.charAt(0)}
+                                 {selectedUser.avatar ? <img src={selectedUser.avatar} alt="Avatar" className="w-full h-full object-cover" /> : (selectedUser.name?.charAt(0) || '?')}
                              </div>
                              <div>
-                                 <h3 className="text-xl font-bold text-slate-900">{selectedUser.name}</h3>
-                                 <p className="text-slate-500">{selectedUser.email}</p>
+                                 <h3 className="text-xl font-bold text-slate-900">{selectedUser.name || 'N/A'}</h3>
+                                 <p className="text-slate-500">{selectedUser.email || 'N/A'}</p>
                                  <div className="flex gap-2 mt-2">
-                                     <Badge variant="default" className="bg-slate-100 text-slate-700">{selectedUser.role}</Badge>
-                                     <Badge variant={selectedUser.status === 'Active' ? 'success' : 'danger'}>{selectedUser.status}</Badge>
+                                     <Badge variant="default" className="bg-slate-100 text-slate-700">{selectedUser.role || 'N/A'}</Badge>
+                                     <Badge variant={selectedUser.status === 'Active' ? 'success' : 'danger'}>{selectedUser.status || 'N/A'}</Badge>
                                  </div>
                              </div>
                         </div>
@@ -1598,6 +1675,58 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                             </div>
                         )}
 
+                        {/* Ticket History Section */}
+                        {selectedUser && getUserTickets(selectedUser.id).length > 0 && (
+                            <div className="space-y-4 pt-4 border-t border-slate-100">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="font-bold text-xl text-slate-900">Ticket History</h4>
+                                    <Badge className="bg-emerald-100 text-emerald-800 px-3 py-1">
+                                        {getUserTickets(selectedUser.id).length} Total
+                                    </Badge>
+                                </div>
+
+                                <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+                                    {getUserTickets(selectedUser.id).map(t => (
+                                        <div 
+                                            key={t.id} 
+                                            onClick={async () => {
+                                                setSelectedUser(null);
+                                                // Fetch full ticket details with comments
+                                                try {
+                                                    const fullTicket = await ticketAPI.getById(t.id);
+                                                    setSelectedTicket(fullTicket);
+                                                } catch (error) {
+                                                    console.error('Error fetching ticket details:', error);
+                                                    // Fallback to the ticket from list if API fails
+                                                    setSelectedTicket(t);
+                                                }
+                                            }}
+                                            className="border border-slate-200 rounded-xl p-5 hover:bg-slate-50 transition-all group bg-white cursor-pointer hover:border-emerald-400 hover:shadow-md relative"
+                                        >
+                                            <div className="flex justify-between items-start pr-8">
+                                                <div>
+                                                    <span className="text-xs font-mono text-slate-400 block mb-1">{t.id}</span>
+                                                    <h5 className="font-bold text-lg text-slate-900 group-hover:text-emerald-600 transition-colors">{t.title}</h5>
+                                                    <p className="text-sm text-slate-600 mt-1 font-medium">{t.category}</p>
+                                                    {t.subcategory && <p className="text-xs text-emerald-600 mt-1 font-medium">{t.subcategory}</p>}
+                                                </div>
+                                                <Badge className="px-3 py-1 text-xs" variant={t.status === 'Resolved' ? 'success' : t.status === 'In Progress' ? 'info' : 'warning'}>
+                                                    {t.status}
+                                                </Badge>
+                                            </div>
+                                            <div className="mt-4 pt-3 border-t border-slate-50 text-xs text-slate-400 flex justify-between items-center">
+                                                <span className="flex items-center"><Clock className="h-3 w-3 mr-1"/> {t.submittedDate}</span>
+                                                <span className="flex items-center gap-1">Priority: <span className={`font-bold uppercase ${t.priority === 'High' ? 'text-red-500' : t.priority === 'Medium' ? 'text-amber-500' : 'text-blue-500'}`}>{t.priority}</span></span>
+                                            </div>
+                                            <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300 group-hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-all">
+                                                <ChevronRight className="h-6 w-6" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="space-y-4 pt-2">
                              <h4 className="font-bold text-sm text-slate-500 uppercase tracking-wider">Management Actions</h4>
                              <div className="grid grid-cols-1 gap-3">
@@ -1613,6 +1742,10 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                                  </Button>
                              </div>
                         </div>
+                    </div>
+                ) : (
+                    <div className="text-center py-8 text-slate-500">
+                        <p>Loading user details...</p>
                     </div>
                 )}
             </Modal>
@@ -1729,6 +1862,175 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
                         </Button>
                     </div>
                 </div>
+            </Modal>
+
+            {/* Ticket Detail Modal */}
+            <Modal
+                isOpen={!!selectedTicket}
+                onClose={() => setSelectedTicket(null)}
+                title={selectedTicket ? `Ticket #${selectedTicket.id}` : 'Ticket Details'}
+                maxWidth="max-w-4xl"
+            >
+                {selectedTicket && (
+                    <div className="space-y-6">
+                        <div className="flex justify-between items-start">
+                            <h1 className="text-2xl font-bold text-slate-900 leading-tight">{selectedTicket.title}</h1>
+                            <Badge 
+                                className="px-4 py-1.5 text-sm font-bold ml-4 rounded-lg whitespace-nowrap" 
+                                variant={selectedTicket.status === 'Resolved' ? 'success' : selectedTicket.status === 'In Progress' ? 'info' : 'warning'}
+                            >
+                                {selectedTicket.status}
+                            </Badge>
+                        </div>
+
+                        {/* Info Grid */}
+                        <div className="grid grid-cols-3 gap-6 pb-6 border-b border-slate-100">
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Type</p>
+                                <p className="text-base font-semibold text-slate-900">{selectedTicket.subcategory || 'General Request'}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Category</p>
+                                <p className="text-base font-semibold text-slate-900">{selectedTicket.category}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Priority</p>
+                                <p className={`text-base font-semibold ${selectedTicket.priority === 'High' ? 'text-red-500' : selectedTicket.priority === 'Medium' ? 'text-amber-500' : 'text-blue-500'}`}>
+                                    {selectedTicket.priority}
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Description */}
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-500 mb-3">Description</h3>
+                            <div className="bg-slate-50 p-6 rounded-xl border border-slate-100 text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                {selectedTicket.description}
+                            </div>
+                        </div>
+
+                        {/* Attachments */}
+                        {selectedTicket.attachment && selectedTicket.attachment.name && (
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-500 mb-3">Attachments</h3>
+                                <div className="border border-slate-200 rounded-xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors bg-white">
+                                    <div className="flex items-center space-x-4">
+                                        <div className="h-12 w-12 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600">
+                                            <FileText className="h-6 w-6" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-900">{selectedTicket.attachment.name || 'Attachment'}</p>
+                                            <p className="text-xs text-slate-500 font-mono uppercase">
+                                                {(selectedTicket.attachment.type && typeof selectedTicket.attachment.type === 'string' && selectedTicket.attachment.type.split('/')[1]) || 'FILE'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {selectedTicket.attachment.url && (
+                                        <a 
+                                            href={selectedTicket.attachment.url} 
+                                            download={selectedTicket.attachment.name}
+                                            className="text-emerald-600 hover:text-emerald-700 font-medium text-sm flex items-center"
+                                        >
+                                            <Download className="h-4 w-4 mr-1" /> Download
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Communication/Comments */}
+                        <div className="pt-4 border-t border-slate-100">
+                            <div className="flex items-center space-x-2 mb-4">
+                                <MessageSquare className="h-5 w-5 text-slate-400" />
+                                <h3 className="text-lg font-bold text-slate-900">Communication</h3>
+                                <Badge className="bg-slate-100 text-slate-600 rounded-full px-2">
+                                    {(selectedTicket.comments || []).length}
+                                </Badge>
+                            </div>
+
+                            <div className="space-y-6">
+                                {(selectedTicket.comments || []).length > 0 ? (
+                                    (selectedTicket.comments || []).map((comment) => (
+                                        <div key={comment.id} className={`flex ${comment.role === 'Student' ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`flex gap-3 max-w-[80%] ${comment.role === 'Student' ? 'flex-row-reverse' : 'flex-row'}`}>
+                                                <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                                                    comment.role === 'Student' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'
+                                                }`}>
+                                                    {comment.authorName?.charAt(0) || '?'}
+                                                </div>
+                                                <div>
+                                                    <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
+                                                        comment.role === 'Student' 
+                                                        ? 'bg-indigo-50 text-slate-800 rounded-tr-none' 
+                                                        : 'bg-emerald-50 text-slate-800 rounded-tl-none border border-emerald-100'
+                                                    }`}>
+                                                        <p className="font-bold text-xs mb-1 opacity-70">
+                                                            {comment.authorName || 'Unknown'} <span className="font-normal opacity-75">• {comment.role || 'N/A'}</span>
+                                                        </p>
+                                                        {comment.text || ''}
+                                                        {comment.attachment && comment.attachment.url && (
+                                                            <div className="mt-3 pt-2 border-t border-black/5">
+                                                                {comment.attachment.type && typeof comment.attachment.type === 'string' && comment.attachment.type.startsWith('image/') ? (
+                                                                    <div className="mt-2">
+                                                                        <img 
+                                                                            src={comment.attachment.url} 
+                                                                            alt="Attachment" 
+                                                                            className="rounded-lg max-h-48 w-auto object-cover border border-slate-200"
+                                                                            onError={(e) => {
+                                                                                (e.target as HTMLImageElement).style.display = 'none';
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="bg-white/50 p-2 rounded-lg border border-slate-200/50 flex items-center gap-2 max-w-fit mt-1">
+                                                                        <Paperclip className="h-4 w-4 text-black flex-shrink-0" />
+                                                                        <a href={comment.attachment.url} download={comment.attachment.name || 'attachment'} className="text-xs font-bold text-slate-900 hover:underline hover:text-emerald-600 truncate max-w-[200px]">
+                                                                            {comment.attachment.name || 'Download'}
+                                                                        </a>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <p className={`text-[10px] text-slate-400 mt-1 ${comment.role === 'Student' ? 'text-right' : 'text-left'}`}>
+                                                        {comment.timestamp}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-center py-8 text-slate-500">
+                                        <MessageSquare className="h-8 w-8 mx-auto mb-2 text-slate-300" />
+                                        <p className="text-sm">No comments yet</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Appointment Date (if set) */}
+                        {selectedTicket.appointmentDate && (
+                            <div className="pt-4 border-t border-slate-100">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Calendar className="h-4 w-4 text-emerald-600" />
+                                    <h3 className="text-sm font-bold text-slate-500">Appointment</h3>
+                                </div>
+                                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+                                    <p className="text-base font-bold text-emerald-700">{selectedTicket.appointmentDate}</p>
+                                    {selectedTicket.appointmentTime && (
+                                        <p className="text-sm text-emerald-600 mt-1">{selectedTicket.appointmentTime}</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Ticket Info Footer */}
+                        <div className="pt-4 border-t border-slate-100 text-xs text-slate-500 flex justify-between">
+                            <span>Submitted: {selectedTicket.submittedDate || 'N/A'}</span>
+                            <span>Last Updated: {selectedTicket.lastUpdated || selectedTicket.submittedDate || 'N/A'}</span>
+                        </div>
+                    </div>
+                )}
             </Modal>
 
         </div>

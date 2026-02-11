@@ -2,10 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardProps, Ticket, User as UserType, Priority, TicketStatus } from '../types';
 import { useData } from '../context/DataContext';
+import { ticketAPI } from '../services/api';
 import { LayoutGrid, Ticket as TicketIcon, BarChart2, Settings, Search, Filter, MessageSquare, TrendingUp, CheckCircle, Clock, User, Building, Phone, Calendar, Save, Camera, Mail, Send, AlertCircle, PieChart as PieChartIcon, Lock, ChevronRight, FileText, Download, ArrowLeft, Info, Activity, Eye, EyeOff, Paperclip, X, Hash, BookOpen } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Modal, Select, Label, Toast, Pagination } from './UIComponents';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import Logo from '../assets/logo.jpg';
 
 export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const { tickets, users, updateTicketStatus, updateTicketPriority, setTicketAppointment, addComment, updateUser } = useData();
@@ -60,17 +62,21 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
 
   const [isSaving, setIsSaving] = useState(false);
 
-  // Reset appointment state when selected ticket changes
+  // Reset appointment state when selected ticket changes or modal closes
   useEffect(() => {
     if (selectedTicket) {
         setAppointmentDate(selectedTicket.appointmentDate || '');
+    } else {
+        // Clear appointment date when modal closes
+        setAppointmentDate('');
     }
   }, [selectedTicket]);
 
   // --- Derived Data (Realtime) ---
 
   // 1. Stats - Filter specifically for Administrative tickets
-  const adminTickets = tickets.filter(t => t.category === 'Administrative'); 
+  // Show all tickets to avoid empty dashboard when no Administrative-only tickets
+  const adminTickets = tickets;
   const pendingCount = adminTickets.filter(t => t.status === 'Pending').length;
   const inProgressCount = adminTickets.filter(t => t.status === 'In Progress').length;
   const resolvedCount = adminTickets.filter(t => t.status === 'Resolved').length;
@@ -133,7 +139,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
   );
 
   const getStudentTickets = (studentId: string) => {
-    return tickets.filter(t => t.submittedBy === studentId && t.category === 'Administrative');
+    return tickets.filter(t => String(t.submittedBy) === String(studentId));
   };
 
   // 4. Analytics Data
@@ -146,13 +152,34 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
     { name: 'Pending', value: pendingCount, color: '#f59e0b' },
   ].filter(d => d.value > 0);
 
-  const MOCK_WEEKLY_DATA = [
-      { name: 'Mon', tickets: 12, resolved: 10 },
-      { name: 'Tue', tickets: 19, resolved: 15 },
-      { name: 'Wed', tickets: 15, resolved: 12 },
-      { name: 'Thu', tickets: 22, resolved: 18 },
-      { name: 'Fri', tickets: 30, resolved: 25 },
-  ];
+  // Calculate weekly data from actual tickets
+  const getWeeklyData = () => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay() + 1); // Monday
+    
+    return days.map((day, index) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + index);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayTickets = tickets.filter(t => {
+        const ticketDate = new Date(t.submittedDate).toISOString().split('T')[0];
+        return ticketDate === dateStr;
+      });
+      
+      const resolved = dayTickets.filter(t => t.status === 'Resolved').length;
+      
+      return {
+        name: day,
+        tickets: dayTickets.length,
+        resolved: resolved
+      };
+    });
+  };
+  
+  const WEEKLY_DATA = getWeeklyData();
 
   // --- Handlers ---
   const handleStatusUpdate = (newStatus: string) => {
@@ -173,12 +200,21 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
     }
   };
 
-  const handleSetAppointment = (e: React.FormEvent) => {
+  const handleSetAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedTicket && appointmentDate) {
-        setTicketAppointment(selectedTicket.id, appointmentDate, '');
-        setSelectedTicket({ ...selectedTicket, appointmentDate, appointmentTime: '' });
-        setToast({ message: "Appointment set successfully.", type: 'success' });
+        try {
+            await setTicketAppointment(selectedTicket.id, appointmentDate, '');
+            // Fetch updated ticket to get the latest data
+            const updatedTicket = await ticketAPI.getById(selectedTicket.id);
+            setSelectedTicket(updatedTicket);
+            // Clear the appointment date input after successful submission
+            setAppointmentDate('');
+            setToast({ message: "Appointment set successfully.", type: 'success' });
+        } catch (error) {
+            console.error('Error setting appointment:', error);
+            setToast({ message: "Failed to set appointment.", type: 'error' });
+        }
     } else {
         setToast({ message: "Please select a date.", type: 'error' });
     }
@@ -260,7 +296,11 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
         <aside className="w-72 bg-white border-r border-slate-200 hidden md:flex flex-col h-full fixed left-0 top-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
             <div className="p-8 flex items-center space-x-4 border-b border-slate-50">
                <div className="h-12 w-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-                  <Building className="text-white h-7 w-7" />
+                <img
+                  src={Logo}
+                  alt="PTC Logo"
+                  className="mx-auto mb-4 h-20 w-auto"
+                />
                </div>
                <div>
                  <span className="font-bold text-xl text-slate-900 block leading-none">Admin</span>
@@ -425,7 +465,15 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                         <Card className="border border-slate-200 shadow-lg shadow-slate-200/50 rounded-2xl overflow-hidden bg-white">
                             <div className="divide-y divide-slate-100">
                                 {adminTickets.slice(0, 5).map(ticket => (
-                                    <div key={ticket.id} className="bg-white p-4 hover:bg-slate-50 transition-all cursor-pointer group" onClick={() => setSelectedTicket(ticket)}>
+                                    <div key={ticket.id} className="bg-white p-4 hover:bg-slate-50 transition-all cursor-pointer group" onClick={async () => {
+                                        try {
+                                            const fullTicket = await ticketAPI.getById(ticket.id);
+                                            setSelectedTicket(fullTicket);
+                                        } catch (error) {
+                                            console.error('Error fetching ticket details:', error);
+                                            setSelectedTicket(ticket);
+                                        }
+                                    }}>
                                         <div className="flex flex-col md:flex-row justify-between gap-3">
                                             <div className="flex flex-col gap-1 flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
@@ -510,7 +558,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                                 </CardHeader>
                                 <CardContent className="h-[350px]">
                                     <ResponsiveContainer width="99%" height="100%">
-                                        <BarChart data={MOCK_WEEKLY_DATA} barSize={40}>
+                                        <BarChart data={WEEKLY_DATA} barSize={40}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
                                             <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
@@ -627,7 +675,15 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                       <div className="grid gap-4">
                            {paginatedTickets.length > 0 ? (
                                paginatedTickets.map(ticket => (
-                                  <div key={ticket.id} className="group bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-all duration-200 hover:border-blue-300 cursor-pointer" onClick={() => setSelectedTicket(ticket)}>
+                                  <div key={ticket.id} className="group bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md transition-all duration-200 hover:border-blue-300 cursor-pointer" onClick={async () => {
+                                        try {
+                                            const fullTicket = await ticketAPI.getById(ticket.id);
+                                            setSelectedTicket(fullTicket);
+                                        } catch (error) {
+                                            console.error('Error fetching ticket details:', error);
+                                            setSelectedTicket(ticket);
+                                        }
+                                    }}>
                                       <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
                                           <div className="space-y-2">
                                               <div className="flex items-center flex-wrap gap-2">
@@ -1062,7 +1118,12 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
             {/* Ticket Detail Modal */}
             <Modal 
               isOpen={!!selectedTicket} 
-              onClose={() => setSelectedTicket(null)}
+              onClose={() => {
+                setSelectedTicket(null);
+                setAppointmentDate(''); // Clear appointment date when closing modal
+                setCommentText(''); // Also clear comment text
+                setCommentFile(null); // Clear comment file
+              }}
               title={selectedTicket ? `Ticket #${selectedTicket.id}` : 'Ticket Details'}
               maxWidth="max-w-6xl"
             >
@@ -1102,7 +1163,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                               </div>
                           </div>
 
-                          {selectedTicket.attachment && (
+                          {selectedTicket.attachment && selectedTicket.attachment.name && (
                               <div>
                                   <h3 className="text-sm font-bold text-slate-500 mb-3">Attachments (1)</h3>
                                   <div className="border border-slate-200 rounded-xl p-4 flex items-center justify-between hover:bg-slate-50 transition-colors bg-white">
@@ -1111,17 +1172,19 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                                              <FileText className="h-6 w-6" />
                                          </div>
                                          <div>
-                                             <p className="text-sm font-bold text-slate-900">{selectedTicket.attachment.name}</p>
-                                             <p className="text-xs text-slate-500 font-mono uppercase">{selectedTicket.attachment.type.split('/')[1] || 'FILE'}</p>
+                                             <p className="text-sm font-bold text-slate-900">{selectedTicket.attachment.name || 'Attachment'}</p>
+                                             <p className="text-xs text-slate-500 font-mono uppercase">{(selectedTicket.attachment.type && typeof selectedTicket.attachment.type === 'string' && selectedTicket.attachment.type.split('/')[1]) || 'FILE'}</p>
                                          </div>
                                      </div>
-                                     <a 
-                                         href={selectedTicket.attachment.url} 
-                                         download={selectedTicket.attachment.name}
-                                         className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center"
-                                     >
-                                         <Download className="h-4 w-4 mr-1" /> Download
-                                     </a>
+                                     {selectedTicket.attachment.url && (
+                                         <a 
+                                             href={selectedTicket.attachment.url} 
+                                             download={selectedTicket.attachment.name}
+                                             className="text-blue-600 hover:text-blue-700 font-medium text-sm flex items-center"
+                                         >
+                                             <Download className="h-4 w-4 mr-1" /> Download
+                                         </a>
+                                     )}
                                  </div>
                               </div>
                           )}
@@ -1131,15 +1194,15 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                               <div className="flex items-center space-x-2 mb-4">
                                   <MessageSquare className="h-5 w-5 text-slate-400" />
                                   <h3 className="text-lg font-bold text-slate-900">Communication</h3>
-                                  <Badge className="bg-slate-100 text-slate-600 rounded-full px-2">{selectedTicket.comments.length}</Badge>
+                                  <Badge className="bg-slate-100 text-slate-600 rounded-full px-2">{(selectedTicket.comments || []).length}</Badge>
                               </div>
 
                               <div className="space-y-6 mb-6">
-                                 {selectedTicket.comments.map((comment) => (
+                                 {(selectedTicket.comments || []).map((comment) => (
                                      <div key={comment.id} className={`flex ${comment.role === 'Student' ? 'justify-end' : 'justify-start'}`}>
                                          <div className={`flex gap-3 max-w-[80%] ${comment.role === 'Student' ? 'flex-row-reverse' : 'flex-row'}`}>
                                              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${comment.role === 'Student' ? 'bg-indigo-100 text-indigo-700' : 'bg-blue-100 text-blue-700'}`}>
-                                                 {comment.authorName.charAt(0)}
+                                                 {comment.authorName?.charAt(0) || '?'}
                                              </div>
                                              <div>
                                                  <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
@@ -1147,17 +1210,20 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                                                      ? 'bg-indigo-50 text-slate-800 rounded-tr-none' 
                                                      : 'bg-blue-50 text-slate-800 rounded-tl-none border border-blue-100'
                                                  }`}>
-                                                     <p className="font-bold text-xs mb-1 opacity-70">{comment.authorName} <span className="font-normal opacity-75">• {comment.role}</span></p>
-                                                     {comment.text}
-                                                     {comment.attachment && (
+                                                     <p className="font-bold text-xs mb-1 opacity-70">{comment.authorName || 'Unknown'} <span className="font-normal opacity-75">• {comment.role || 'N/A'}</span></p>
+                                                     {comment.text || ''}
+                                                     {comment.attachment && comment.attachment.url && (
                                                         <div className="mt-3 pt-2 border-t border-black/5">
-                                                            {comment.attachment.type.startsWith('image/') ? (
+                                                            {comment.attachment.type && typeof comment.attachment.type === 'string' && comment.attachment.type.startsWith('image/') ? (
                                                                 <div className="mt-2 group relative">
                                                                      <img 
                                                                         src={comment.attachment.url} 
                                                                         alt="Attachment" 
                                                                         className="rounded-lg max-h-48 w-auto object-cover border border-slate-200 cursor-pointer hover:opacity-90 transition-opacity bg-white"
                                                                         onClick={() => setPreviewImage(comment.attachment.url)}
+                                                                        onError={(e) => {
+                                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                                        }}
                                                                      />
                                                                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
                                                                         <div className="bg-black/50 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm">Click to view</div>
@@ -1166,8 +1232,8 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                                                             ) : (
                                                                 <div className="bg-white/50 p-2 rounded-lg border border-slate-200/50 flex items-center gap-2 max-w-fit mt-1">
                                                                     <Paperclip className="h-4 w-4 text-black flex-shrink-0" />
-                                                                    <a href={comment.attachment.url} download={comment.attachment.name} className="text-xs font-bold text-slate-900 hover:underline hover:text-blue-600 truncate max-w-[200px]">
-                                                                        {comment.attachment.name}
+                                                                    <a href={comment.attachment.url} download={comment.attachment.name || 'attachment'} className="text-xs font-bold text-slate-900 hover:underline hover:text-blue-600 truncate max-w-[200px]">
+                                                                        {comment.attachment.name || 'Download'}
                                                                     </a>
                                                                 </div>
                                                             )}
@@ -1213,6 +1279,22 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                                   </div>
                               </div>
                           </div>
+
+                          {/* Appointment Date Display (if set) */}
+                          {selectedTicket.appointmentDate && (
+                              <div className="pt-4 border-t border-slate-100">
+                                  <div className="flex items-center gap-2 mb-2">
+                                      <Calendar className="h-4 w-4 text-blue-600" />
+                                      <h3 className="text-sm font-bold text-slate-500">Appointment</h3>
+                                  </div>
+                                  <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                                      <p className="text-base font-bold text-blue-700">{selectedTicket.appointmentDate}</p>
+                                      {selectedTicket.appointmentTime && (
+                                          <p className="text-sm text-blue-600 mt-1">{selectedTicket.appointmentTime}</p>
+                                      )}
+                                  </div>
+                              </div>
+                          )}
                      </div>
 
                      {/* Right Sidebar */}
@@ -1332,7 +1414,9 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    {/* Ticket History Section - Always Visible */}
+                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-between">
                             <h4 className="font-bold text-xl text-slate-900">Ticket History</h4>
                             <Badge className="bg-blue-100 text-blue-800 px-3 py-1">
                                 {getStudentTickets(selectedStudent.id).length} Total
@@ -1344,9 +1428,17 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                                 getStudentTickets(selectedStudent.id).map(t => (
                                     <div 
                                         key={t.id} 
-                                        onClick={() => {
+                                        onClick={async () => {
                                             setSelectedStudent(null);
-                                            setSelectedTicket(t);
+                                            // Fetch full ticket details with comments
+                                            try {
+                                                const fullTicket = await ticketAPI.getById(t.id);
+                                                setSelectedTicket(fullTicket);
+                                            } catch (error) {
+                                                console.error('Error fetching ticket details:', error);
+                                                // Fallback to the ticket from list if API fails
+                                                setSelectedTicket(t);
+                                            }
                                         }}
                                         className="border border-slate-200 rounded-xl p-5 hover:bg-slate-50 transition-all group bg-white cursor-pointer hover:border-blue-400 hover:shadow-md relative"
                                     >
@@ -1377,9 +1469,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
                                 </div>
                             )}
                         </div>
-                        <div className="flex justify-end pt-2">
-                            <Button variant="outline" className="w-full" onClick={() => setSelectedStudent(null)}>Close History</Button>
-                        </div>
+                    </div>
                     </div>
                 )}
             </Modal>

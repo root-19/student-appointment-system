@@ -2,10 +2,12 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardProps, Ticket, User as UserType, TicketStatus, Priority } from '../types';
 import { useData } from '../context/DataContext';
+import { ticketAPI } from '../services/api';
 import { Home, FileText, Settings, CheckCircle, Clock, AlertCircle, Search, User, Lock, Save, Camera, Mail, Building, Phone, ChevronRight, Calendar, MessageSquare, Send, BarChart2, PieChart as PieChartIcon, TrendingUp, Download, ArrowLeft, Info, Activity, Eye, EyeOff, Hash, BookOpen, Paperclip, X, Filter } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Modal, Select, Toast } from './UIComponents';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
+import Logo from '../assets/logo.jpg';
 
 export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const { tickets, users, updateTicketStatus, updateTicketPriority, setTicketAppointment, addComment, updateUser } = useData();
@@ -64,6 +66,9 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
   useEffect(() => {
     if (selectedTicket) {
         setAppointmentDate(selectedTicket.appointmentDate || '');
+    } else {
+        // Clear appointment date when modal closes
+        setAppointmentDate('');
     }
   }, [selectedTicket]);
 
@@ -133,7 +138,7 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
   );
 
   const getStudentTickets = (studentId: string) => {
-    return tickets.filter(t => t.submittedBy === studentId && t.category === 'Academic');
+    return tickets.filter(t => String(t.submittedBy) === String(studentId) && t.category === 'Academic');
   };
 
   // 4. Analytics Data
@@ -146,13 +151,34 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
     { name: 'Pending', value: pendingCount, color: '#f59e0b' },
   ].filter(d => d.value > 0);
 
-  const MOCK_WEEKLY_DATA = [
-      { name: 'Mon', tickets: 5, resolved: 3 },
-      { name: 'Tue', tickets: 8, resolved: 4 },
-      { name: 'Wed', tickets: 6, resolved: 5 },
-      { name: 'Thu', tickets: 9, resolved: 7 },
-      { name: 'Fri', tickets: 12, resolved: 8 },
-  ];
+  // Calculate weekly data from actual tickets
+  const getWeeklyData = () => {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay() + 1); // Monday
+    
+    return days.map((day, index) => {
+      const date = new Date(weekStart);
+      date.setDate(weekStart.getDate() + index);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const dayTickets = tickets.filter(t => {
+        const ticketDate = new Date(t.submittedDate).toISOString().split('T')[0];
+        return ticketDate === dateStr;
+      });
+      
+      const resolved = dayTickets.filter(t => t.status === 'Resolved').length;
+      
+      return {
+        name: day,
+        tickets: dayTickets.length,
+        resolved: resolved
+      };
+    });
+  };
+  
+  const WEEKLY_DATA = getWeeklyData();
 
   // --- Handlers ---
 
@@ -174,12 +200,21 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
     }
   };
 
-  const handleSetAppointment = (e: React.FormEvent) => {
+  const handleSetAppointment = async (e: React.FormEvent) => {
       e.preventDefault();
       if (selectedTicket && appointmentDate) {
-          setTicketAppointment(selectedTicket.id, appointmentDate, '');
-          setSelectedTicket({ ...selectedTicket, appointmentDate, appointmentTime: '' });
-          setToast({ message: "Appointment set successfully.", type: 'success' });
+          try {
+              await setTicketAppointment(selectedTicket.id, appointmentDate, '');
+              // Fetch updated ticket to get the latest data
+              const updatedTicket = await ticketAPI.getById(selectedTicket.id);
+              setSelectedTicket(updatedTicket);
+              // Clear the appointment date input after successful submission
+              setAppointmentDate('');
+              setToast({ message: "Appointment set successfully.", type: 'success' });
+          } catch (error) {
+              console.error('Error setting appointment:', error);
+              setToast({ message: "Failed to set appointment.", type: 'error' });
+          }
       } else {
           setToast({ message: "Please select a date.", type: 'error' });
       }
@@ -210,7 +245,7 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
       
       setSelectedTicket({
           ...selectedTicket,
-          comments: [...selectedTicket.comments, newComment]
+          comments: [...(selectedTicket.comments || []), newComment]
       });
 
       setCommentText('');
@@ -263,7 +298,11 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
         {/* ... Sidebar Content ... */}
         <div className="p-8 flex items-center space-x-4 border-b border-slate-50">
            <div className="h-12 w-12 bg-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200">
-              <BookOpen className="text-white h-7 w-7" />
+               <img
+                 src={Logo}
+                 alt="PTC Logo"
+                 className="mx-auto mb-4 h-20 w-auto"
+               />
            </div>
            <div>
              <span className="font-bold text-xl text-slate-900 block leading-none">Academic</span>
@@ -525,7 +564,7 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
                               </CardHeader>
                               <CardContent className="h-[350px]">
                                   <ResponsiveContainer width="99%" height="100%">
-                                      <BarChart data={MOCK_WEEKLY_DATA} barSize={40}>
+                                      <BarChart data={WEEKLY_DATA} barSize={40}>
                                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                           <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
                                           <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
@@ -1098,7 +1137,12 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
           {/* Ticket Detail Modal ... */}
           <Modal 
               isOpen={!!selectedTicket} 
-              onClose={() => setSelectedTicket(null)}
+              onClose={() => {
+                setSelectedTicket(null);
+                setAppointmentDate(''); // Clear appointment date when closing modal
+                setCommentText(''); // Also clear comment text
+                setCommentFile(null); // Clear comment file
+              }}
               title={selectedTicket ? `Ticket #${selectedTicket.id}` : 'Ticket Details'}
               maxWidth="max-w-6xl"
           >
@@ -1152,7 +1196,7 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
                                          </div>
                                          <div>
                                              <p className="text-sm font-bold text-slate-900">{selectedTicket.attachment.name}</p>
-                                             <p className="text-xs text-slate-500 font-mono uppercase">{selectedTicket.attachment.type.split('/')[1] || 'FILE'}</p>
+                                             <p className="text-xs text-slate-500 font-mono uppercase">{(selectedTicket.attachment.type && selectedTicket.attachment.type.split('/')[1]) || 'FILE'}</p>
                                          </div>
                                      </div>
                                      <a 
@@ -1172,15 +1216,15 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
                               <div className="flex items-center space-x-2 mb-4">
                                   <MessageSquare className="h-5 w-5 text-slate-400" />
                                   <h3 className="text-lg font-bold text-slate-900">Communication</h3>
-                                  <Badge className="bg-slate-100 text-slate-600 rounded-full px-2">{selectedTicket.comments.length}</Badge>
+                                  <Badge className="bg-slate-100 text-slate-600 rounded-full px-2">{(selectedTicket.comments || []).length}</Badge>
                               </div>
 
                               <div className="space-y-6 mb-6">
-                                 {selectedTicket.comments.map((comment) => (
+                                 {(selectedTicket.comments || []).map((comment) => (
                                      <div key={comment.id} className={`flex ${comment.role === 'Student' ? 'justify-end' : 'justify-start'}`}>
                                          <div className={`flex gap-3 max-w-[80%] ${comment.role === 'Student' ? 'flex-row-reverse' : 'flex-row'}`}>
                                              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${comment.role === 'Student' ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}`}>
-                                                 {comment.authorName.charAt(0)}
+                                                 {(comment.authorName || 'U').charAt(0)}
                                              </div>
                                              <div>
                                                  <div className={`p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
@@ -1188,12 +1232,12 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
                                                      ? 'bg-indigo-50 text-slate-800 rounded-tr-none' 
                                                      : 'bg-orange-50 text-slate-800 rounded-tl-none border border-orange-100'
                                                  }`}>
-                                                     <p className="font-bold text-xs mb-1 opacity-70">{comment.authorName} <span className="font-normal opacity-75">• {comment.role}</span></p>
-                                                     {comment.text}
+                                                     <p className="font-bold text-xs mb-1 opacity-70">{comment.authorName || 'Unknown'} <span className="font-normal opacity-75">• {comment.role || 'User'}</span></p>
+                                                     {comment.text || 'No message'}
                                                      {/* Render Comment Attachment */}
                                                      {comment.attachment && (
                                                         <div className="mt-3 pt-2 border-t border-black/5">
-                                                            {comment.attachment.type.startsWith('image/') ? (
+                                                            {comment.attachment.type && comment.attachment.type.startsWith('image/') ? (
                                                                 <div className="mt-2 group relative">
                                                                      <img 
                                                                         src={comment.attachment.url} 
@@ -1216,7 +1260,7 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
                                                         </div>
                                                      )}
                                                  </div>
-                                                 <p className={`text-[10px] text-slate-400 mt-1 ${comment.role === 'Student' ? 'text-right' : 'text-left'}`}>{comment.timestamp}</p>
+                                                 <p className={`text-[10px] text-slate-400 mt-1 ${comment.role === 'Student' ? 'text-right' : 'text-left'}`}>{comment.timestamp || 'Just now'}</p>
                                              </div>
                                          </div>
                                      </div>
@@ -1388,15 +1432,17 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
                         </div>
                     </div>
 
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                        <h4 className="font-bold text-xl text-slate-900">Ticket History</h4>
-                        <Badge className="bg-orange-100 text-orange-800 px-3 py-1">
-                            {getStudentTickets(selectedStudent.id).length} Total
-                        </Badge>
-                    </div>
+                    {/* Ticket History Section - Always Visible */}
+                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-between">
+                            <h4 className="font-bold text-xl text-slate-900">Ticket History</h4>
+                            <Badge className="bg-orange-100 text-orange-800 px-3 py-1">
+                                {getStudentTickets(selectedStudent.id).length} Total
+                            </Badge>
+                        </div>
 
-                    <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
-                        {getStudentTickets(selectedStudent.id).length > 0 ? (
+                        <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2">
+                            {getStudentTickets(selectedStudent.id).length > 0 ? (
                             getStudentTickets(selectedStudent.id).map(t => (
                                 <div 
                                     key={t.id} 
@@ -1433,9 +1479,7 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
                             </div>
                         )}
                     </div>
-                    <div className="flex justify-end pt-2">
-                        <Button variant="outline" className="w-full" onClick={() => setSelectedStudent(null)}>Close History</Button>
-                    </div>
+                </div>
                 </div>
             )}
         </Modal>

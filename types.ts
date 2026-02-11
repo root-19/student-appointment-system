@@ -71,7 +71,7 @@ export interface RegistrationRequest {
   program: string;
   yearLevel: string;
   section: string;
-  password?: string; // Stored for mock purposes only
+  password?: string; // Not sent to API, only used for local validation
   documentName: string;
   documentUrl?: string; // URL for the uploaded file
   documentType?: string; // MIME type

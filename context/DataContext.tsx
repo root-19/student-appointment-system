@@ -1,8 +1,15 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Ticket, Document, Role, RegistrationRequest, Comment, Notification, Priority, TicketAttachment } from '../types';
-import { MOCK_USERS, MOCK_TICKETS, MOCK_DOCUMENTS } from '../constants';
-import { createTicketObject, NewTicketInput } from '../services/ticketService';
+import { NewTicketInput } from '../services/ticketService';
+import {
+  authAPI,
+  userAPI,
+  ticketAPI,
+  commentAPI,
+  documentAPI,
+  notificationAPI,
+  registrationRequestAPI,
+} from '../services/api';
 
 interface DataContextType {
   currentUser: User | null;
@@ -11,266 +18,334 @@ interface DataContextType {
   documents: Document[];
   notifications: Notification[];
   pendingRegistrations: RegistrationRequest[];
-  login: (email: string, password: string) => boolean;
-  logout: () => void;
-  addTicket: (ticket: NewTicketInput) => void;
-  updateTicketStatus: (ticketId: string, status: Ticket['status']) => void;
-  updateTicketPriority: (ticketId: string, priority: Priority) => void;
-  setTicketAppointment: (ticketId: string, date: string, time: string) => void;
-  addDocument: (doc: Omit<Document, 'id' | 'uploadDate' | 'status'>) => void;
-  addUser: (user: Omit<User, 'id'>) => void;
-  updateUser: (userId: string, updates: Partial<User>) => void;
-  deleteUser: (userId: string) => void;
-  registerUser: (data: Omit<RegistrationRequest, 'id' | 'status' | 'dateSubmitted'>) => void;
-  approveRegistration: (id: string) => void;
-  rejectRegistration: (id: string) => void;
-  addComment: (ticketId: string, text: string, attachmentFile?: File | null) => void;
-  markNotificationAsRead: (id: string) => void;
-  clearAllNotifications: () => void;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  addTicket: (ticket: NewTicketInput) => Promise<void>;
+  updateTicketStatus: (ticketId: string, status: Ticket['status']) => Promise<void>;
+  updateTicketPriority: (ticketId: string, priority: Priority) => Promise<void>;
+  setTicketAppointment: (ticketId: string, date: string, time: string) => Promise<void>;
+  addDocument: (doc: Omit<Document, 'id' | 'uploadDate' | 'status'>) => Promise<void>;
+  addUser: (user: Omit<User, 'id'>) => Promise<void>;
+  updateUser: (userId: string, updates: Partial<User>) => Promise<void>;
+  deleteUser: (userId: string) => Promise<void>;
+  registerUser: (data: Omit<RegistrationRequest, 'id' | 'status' | 'dateSubmitted'>) => Promise<void>;
+  approveRegistration: (id: string) => Promise<void>;
+  rejectRegistration: (id: string) => Promise<void>;
+  addComment: (ticketId: string, text: string, attachmentFile?: File | null) => Promise<void>;
+  markNotificationAsRead: (id: string) => Promise<void>;
+  clearAllNotifications: () => Promise<void>;
+  refreshData: () => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  // Initialize users with 'Active' status if undefined to prevent them showing as Inactive
-  const [users, setUsers] = useState<User[]>(MOCK_USERS.map(u => ({ ...u, status: u.status || 'Active' })));
-  const [tickets, setTickets] = useState<Ticket[]>(MOCK_TICKETS);
-  const [documents, setDocuments] = useState<Document[]>(MOCK_DOCUMENTS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [pendingRegistrations, setPendingRegistrations] = useState<RegistrationRequest[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    // Mock Initial Notification
-    {
-      id: 'n1',
-      recipientId: 'u1', // Juan Dela Cruz
-      title: 'Welcome to the Portal',
-      message: 'You can now submit tickets and view your documents.',
-      type: 'System',
-      timestamp: new Date().toLocaleDateString(),
-      isRead: false
-    }
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  // Persist user session
+  // Load initial data
   useEffect(() => {
-    const storedUser = localStorage.getItem('ticket_sys_user');
-    if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
+    const user = authAPI.getCurrentUser();
+    if (user) {
+      setCurrentUser(user);
+      loadData();
     }
   }, []);
 
-  const login = (email: string, password: string) => {
-    // Strict equality check for both email and password
-    const detectedUser = users.find(u => u.email === email && u.password === password);
+  // Load data when user changes
+  useEffect(() => {
+    if (currentUser) {
+      loadData();
+    }
+  }, [currentUser]);
 
-    if (detectedUser) {
-      // Ensure status is checked
-      if (detectedUser.status === 'Inactive') {
+  const loadData = async () => {
+    if (!currentUser) return;
+
+    setLoading(true);
+    try {
+      // Load tickets based on user role
+      const ticketsParams: any = {};
+      if (currentUser.role === 'Student') {
+        ticketsParams.user_id = currentUser.id;
+      }
+      const ticketsData = await ticketAPI.getAll(ticketsParams);
+      setTickets(ticketsData);
+
+      // Load documents
+      const documentsParams: any = {};
+      if (currentUser.role === 'Student') {
+        documentsParams.user_id = currentUser.id;
+      }
+      const documentsData = await documentAPI.getAll(documentsParams);
+      setDocuments(documentsData);
+
+      // Load notifications
+      const notificationsData = await notificationAPI.getAll();
+      setNotifications(notificationsData);
+
+      // Load users (for admin/superadmin/registrar/academic)
+      if (currentUser.role === 'SuperAdmin' || currentUser.role === 'Admin' || currentUser.role === 'Registrar' || currentUser.role === 'Academic') {
+        const usersData = await userAPI.getAll();
+        setUsers(usersData);
+      }
+
+      // Load registration requests (for admin/superadmin)
+      if (currentUser.role === 'SuperAdmin' || currentUser.role === 'Admin') {
+        const requestsData = await registrationRequestAPI.getAll();
+        setPendingRegistrations(requestsData);
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (email: string): Promise<boolean> => {
+    try {
+      const { user, token } = await authAPI.login(email);
+      
+      if (user.status === 'Inactive') {
         alert("Your account has been deactivated. Please contact the administrator.");
         return false;
       }
-      setCurrentUser(detectedUser);
-      localStorage.setItem('ticket_sys_user', JSON.stringify(detectedUser));
+
+      setCurrentUser(user);
       return true;
-    }
-    return false;
-  };
-
-  const logout = () => {
-    setCurrentUser(null);
-    localStorage.removeItem('ticket_sys_user');
-  };
-
-  const addTicket = (ticketData: NewTicketInput) => {
-    if (!currentUser) return;
-    
-    // Delegate logic to the service layer
-    const newTicket = createTicketObject(ticketData, currentUser, tickets);
-    
-    setTickets([newTicket, ...tickets]);
-  };
-
-  const updateTicketStatus = (ticketId: string, status: Ticket['status']) => {
-    setTickets(tickets.map(t => t.id === ticketId ? { ...t, status, lastUpdated: new Date().toLocaleDateString() } : t));
-
-    // Notification Logic
-    const ticket = tickets.find(t => t.id === ticketId);
-    if (ticket) {
-      const newNotification: Notification = {
-        id: `notif-${Date.now()}`,
-        recipientId: ticket.submittedBy,
-        title: 'Ticket Status Updated',
-        message: `Your ticket #${ticket.id} has been marked as ${status}.`,
-        type: 'StatusUpdate',
-        timestamp: new Date().toLocaleString(),
-        isRead: false,
-        ticketId: ticket.id
-      };
-      setNotifications(prev => [newNotification, ...prev]);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      const message = error.response?.data?.message || error.message || 'Invalid email.';
+      alert(message);
+      return false;
     }
   };
 
-  const updateTicketPriority = (ticketId: string, priority: Priority) => {
-    setTickets(prevTickets => prevTickets.map(t => 
-        t.id === ticketId 
-            ? { ...t, priority, lastUpdated: new Date().toLocaleDateString() } 
-            : t
-    ));
-  };
-
-  const setTicketAppointment = (ticketId: string, date: string, time: string) => {
-    setTickets(tickets.map(t => t.id === ticketId ? { 
-        ...t, 
-        appointmentDate: date, 
-        appointmentTime: time,
-        lastUpdated: new Date().toLocaleDateString() 
-    } : t));
-
-    const ticket = tickets.find(t => t.id === ticketId);
-    if (ticket) {
-        const newNotification: Notification = {
-            id: `notif-apt-${Date.now()}`,
-            recipientId: ticket.submittedBy,
-            title: 'Appointment Scheduled',
-            message: `An appointment has been set for Ticket #${ticket.id} on ${date} at ${time}.`,
-            type: 'Appointment',
-            timestamp: new Date().toLocaleString(),
-            isRead: false,
-            ticketId: ticket.id
-        };
-        setNotifications(prev => [newNotification, ...prev]);
+  const logout = async (): Promise<void> => {
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setCurrentUser(null);
+      setUsers([]);
+      setTickets([]);
+      setDocuments([]);
+      setNotifications([]);
+      setPendingRegistrations([]);
     }
   };
 
-  const addComment = (ticketId: string, text: string, attachmentFile?: File | null) => {
+  const addTicket = async (ticketData: NewTicketInput): Promise<void> => {
     if (!currentUser) return;
 
-    let attachment: TicketAttachment | undefined;
-    if (attachmentFile) {
-        attachment = {
-            name: attachmentFile.name,
-            url: URL.createObjectURL(attachmentFile),
-            type: attachmentFile.type
-        };
-    }
-
-    const newComment: Comment = {
-      id: `c-${Date.now()}`,
-      authorName: currentUser.name,
-      role: currentUser.role,
-      text: text,
-      timestamp: new Date().toLocaleString(),
-      attachment: attachment
-    };
-
-    setTickets(prevTickets => prevTickets.map(t => 
-      t.id === ticketId 
-        ? { ...t, comments: [...t.comments, newComment], lastUpdated: new Date().toLocaleDateString() }
-        : t
-    ));
-
-    // Notification Logic
-    const ticket = tickets.find(t => t.id === ticketId);
-    
-    // Only notify if the commenter is NOT the ticket owner (i.e., Admin/Registrar replied)
-    if (ticket && currentUser.id !== ticket.submittedBy) {
-      const newNotification: Notification = {
-        id: `notif-c-${Date.now()}`,
-        recipientId: ticket.submittedBy,
-        title: 'New Comment',
-        message: `${currentUser.role} ${currentUser.name} commented on ticket #${ticket.id}.`,
-        type: 'NewComment',
-        timestamp: new Date().toLocaleString(),
-        isRead: false,
-        ticketId: ticket.id
-      };
-      setNotifications(prev => [newNotification, ...prev]);
-    }
-  };
-
-  const markNotificationAsRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-  };
-
-  const clearAllNotifications = () => {
-      if(!currentUser) return;
-      setNotifications(prev => prev.filter(n => n.recipientId !== currentUser.id));
-  }
-
-  const addDocument = (docData: Omit<Document, 'id' | 'uploadDate' | 'status'>) => {
-    const newDoc: Document = {
-      ...docData,
-      id: `doc${documents.length + 1}`,
-      uploadDate: new Date().toLocaleDateString(),
-      status: 'Pending'
-    };
-    setDocuments([newDoc, ...documents]);
-  };
-
-  const addUser = (userData: Omit<User, 'id'>) => {
-    const newUser: User = {
-      ...userData,
-      id: `u${users.length + 1}`,
-      status: 'Active'
-    };
-    setUsers([...users, newUser]);
-  };
-
-  const updateUser = (userId: string, updates: Partial<User>) => {
-    setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, ...updates } : u));
-    
-    // If the updated user is the current user, update session state and local storage immediately
-    if (currentUser && currentUser.id === userId) {
-      const updatedCurrentUser = { ...currentUser, ...updates };
-      setCurrentUser(updatedCurrentUser);
-      localStorage.setItem('ticket_sys_user', JSON.stringify(updatedCurrentUser));
-    }
-  };
-
-  const deleteUser = (userId: string) => {
-    setUsers(users.filter(u => u.id !== userId));
-  };
-
-  const registerUser = (data: Omit<RegistrationRequest, 'id' | 'status' | 'dateSubmitted'>) => {
-    const newRequest: RegistrationRequest = {
-      ...data,
-      id: `req_${Math.random().toString(36).substr(2, 9)}`,
-      status: 'Pending',
-      dateSubmitted: new Date().toLocaleDateString()
-    };
-    setPendingRegistrations([...pendingRegistrations, newRequest]);
-  };
-
-  const approveRegistration = (id: string) => {
-    const request = pendingRegistrations.find(r => r.id === id);
-    if (request) {
-      // Add to active users
-      addUser({
-        name: request.name,
-        email: request.email,
-        role: 'Student',
-        studentId: request.studentId,
-        program: request.program || 'BSIT',
-        yearLevel: request.yearLevel || '1st Year',
-        section: request.section || 'A',
-        documentUrl: request.documentUrl // Include the document URL in the new user profile if needed
+    try {
+      const newTicket = await ticketAPI.create({
+        title: ticketData.title,
+        category: ticketData.category,
+        subcategory: ticketData.subcategory,
+        priority: ticketData.priority,
+        description: ticketData.description,
+        attachment: ticketData.attachment,
       });
-      // Remove from pending
-      setPendingRegistrations(pendingRegistrations.filter(r => r.id !== id));
+      setTickets(prev => [newTicket, ...prev]);
+    } catch (error) {
+      console.error('Error creating ticket:', error);
+      throw error;
     }
   };
 
-  const rejectRegistration = (id: string) => {
-    setPendingRegistrations(pendingRegistrations.filter(r => r.id !== id));
+  const updateTicketStatus = async (ticketId: string, status: Ticket['status']): Promise<void> => {
+    try {
+      const updatedTicket = await ticketAPI.updateStatus(ticketId, status);
+      setTickets(prev => prev.map(t => t.id === ticketId ? updatedTicket : t));
+      
+      // Refresh notifications
+      const notificationsData = await notificationAPI.getAll();
+      setNotifications(notificationsData);
+    } catch (error) {
+      console.error('Error updating ticket status:', error);
+      throw error;
+    }
+  };
+
+  const updateTicketPriority = async (ticketId: string, priority: Priority): Promise<void> => {
+    try {
+      const updatedTicket = await ticketAPI.updatePriority(ticketId, priority);
+      setTickets(prev => prev.map(t => t.id === ticketId ? updatedTicket : t));
+    } catch (error) {
+      console.error('Error updating ticket priority:', error);
+      throw error;
+    }
+  };
+
+  const setTicketAppointment = async (ticketId: string, date: string, time: string): Promise<void> => {
+    try {
+      const updatedTicket = await ticketAPI.setAppointment(ticketId, date, time);
+      setTickets(prev => prev.map(t => t.id === ticketId ? updatedTicket : t));
+      
+      // Refresh notifications
+      const notificationsData = await notificationAPI.getAll();
+      setNotifications(notificationsData);
+    } catch (error) {
+      console.error('Error setting appointment:', error);
+      throw error;
+    }
+  };
+
+  const addComment = async (ticketId: string, text: string, attachmentFile?: File | null): Promise<void> => {
+    if (!currentUser) return;
+
+    try {
+      const newComment = await commentAPI.create(ticketId, text, attachmentFile || null);
+      
+      // Update ticket with new comment
+      const ticket = await ticketAPI.getById(ticketId);
+      setTickets(prev => prev.map(t => t.id === ticketId ? ticket : t));
+      
+      // Refresh notifications
+      const notificationsData = await notificationAPI.getAll();
+      setNotifications(notificationsData);
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      throw error;
+    }
+  };
+
+  const markNotificationAsRead = async (id: string): Promise<void> => {
+    try {
+      await notificationAPI.markAsRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      throw error;
+    }
+  };
+
+  const clearAllNotifications = async (): Promise<void> => {
+    if (!currentUser) return;
+
+    try {
+      await notificationAPI.clearAll();
+      setNotifications([]);
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      throw error;
+    }
+  };
+
+  const addDocument = async (docData: Omit<Document, 'id' | 'uploadDate' | 'status'>): Promise<void> => {
+    if (!docData.name || !(docData as any).file) {
+      throw new Error('Document name and file are required');
+    }
+
+    try {
+      const newDoc = await documentAPI.create(docData.name, (docData as any).file);
+      setDocuments(prev => [newDoc, ...prev]);
+    } catch (error) {
+      console.error('Error adding document:', error);
+      throw error;
+    }
+  };
+
+  const addUser = async (userData: Omit<User, 'id'>): Promise<void> => {
+    try {
+      const newUser = await userAPI.create(userData);
+      setUsers(prev => [...prev, newUser]);
+    } catch (error) {
+      console.error('Error adding user:', error);
+      throw error;
+    }
+  };
+
+  const updateUser = async (userId: string, updates: Partial<User>): Promise<void> => {
+    try {
+      const updatedUser = await userAPI.update(userId, updates);
+      setUsers(prev => prev.map(u => u.id === userId ? updatedUser : u));
+      
+      // If the updated user is the current user, update session state
+      if (currentUser && currentUser.id === userId) {
+        setCurrentUser(updatedUser);
+        localStorage.setItem('ticket_sys_user', JSON.stringify(updatedUser));
+      }
+    } catch (error) {
+      console.error('Error updating user:', error);
+      throw error;
+    }
+  };
+
+  const deleteUser = async (userId: string): Promise<void> => {
+    try {
+      await userAPI.delete(userId);
+      setUsers(prev => prev.filter(u => u.id !== userId));
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      throw error;
+    }
+  };
+
+  const registerUser = async (data: Omit<RegistrationRequest, 'id' | 'status' | 'dateSubmitted'>): Promise<void> => {
+    try {
+      const newRequest = await registrationRequestAPI.create({
+        name: data.name,
+        email: data.email,
+        studentId: data.studentId,
+        program: data.program,
+        yearLevel: data.yearLevel,
+        section: data.section,
+        password: data.password || '',
+        document: (data as any).document,
+      });
+      setPendingRegistrations(prev => [...prev, newRequest]);
+    } catch (error) {
+      console.error('Error registering user:', error);
+      throw error;
+    }
+  };
+
+  const approveRegistration = async (id: string): Promise<void> => {
+    try {
+      await registrationRequestAPI.approve(id);
+      setPendingRegistrations(prev => prev.filter(r => r.id !== id));
+      
+      // Refresh users list
+      if (currentUser && (currentUser.role === 'SuperAdmin' || currentUser.role === 'Admin')) {
+        const usersData = await userAPI.getAll();
+        setUsers(usersData);
+      }
+    } catch (error) {
+      console.error('Error approving registration:', error);
+      throw error;
+    }
+  };
+
+  const rejectRegistration = async (id: string): Promise<void> => {
+    try {
+      await registrationRequestAPI.reject(id);
+      setPendingRegistrations(prev => prev.filter(r => r.id !== id));
+    } catch (error) {
+      console.error('Error rejecting registration:', error);
+      throw error;
+    }
+  };
+
+  const refreshData = async (): Promise<void> => {
+    await loadData();
   };
 
   return (
     <DataContext.Provider value={{ 
-      currentUser, users, tickets, documents, pendingRegistrations, notifications,
+      currentUser, users, tickets, documents, pendingRegistrations, notifications, loading,
       login, logout, addTicket, updateTicketStatus, updateTicketPriority, setTicketAppointment, addComment, addDocument, 
       addUser, updateUser, deleteUser,
       registerUser, approveRegistration, rejectRegistration,
-      markNotificationAsRead, clearAllNotifications
+      markNotificationAsRead, clearAllNotifications, refreshData
     }}>
       {children}
     </DataContext.Provider>

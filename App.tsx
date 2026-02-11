@@ -11,11 +11,9 @@ import { DataProvider, useData } from './context/DataContext';
 const AppContent: React.FC = () => {
   const { currentUser, login, logout } = useData();
 
-  const handleLogin = (email: string, password: string) => {
-    const success = login(email, password);
-    if (!success) {
-      alert("Invalid email or password. Please check your credentials and try again.");
-    }
+  const handleLogin = async (email: string, password: string) => {
+    const success = await login(email, password);
+    return success;
   };
 
   if (!currentUser) {
