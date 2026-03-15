@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { motion as m } from 'framer-motion';
 import { User, Lock, Mail } from 'lucide-react';
 import { Button, Input, Label } from './UIComponents';
-import Logo from '../assets/logo.jpg'
+import Logo from '../assets/logo.png'
 
 // Cast motion to any to avoid TypeScript errors with initial/animate props in this environment
 const motion = m as any;

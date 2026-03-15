@@ -12,7 +12,7 @@ import { ticketAPI } from '../services/api';
 
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Modal, Select, Toast } from './UIComponents';
 
-import Logo from '../assets/logo.jpg';
+import Logo from '../assets/logo.png';
 
 
 
@@ -1913,34 +1913,6 @@ export const StudentDashboard: React.FC<DashboardProps> = ({ user, onLogout }) =
                                                 <Plus className="h-5 w-5" />
 
                                                 Create New Ticket
-
-                                            </button>
-
-                                            <button 
-
-                                                onClick={() => {
-
-                                                    if (myTickets.length > 0) {
-
-                                                        console.log('Test: Setting first ticket as selected');
-
-                                                        setSelectedTicket(myTickets[0]);
-
-                                                    } else {
-
-                                                        console.log('No tickets available for test');
-
-                                                    }
-
-                                                }}
-
-                                                className="bg-blue-600 text-white hover:bg-blue-700 font-bold py-3 px-6 rounded-xl shadow-sm transition-all transform hover:-translate-y-0.5 flex items-center gap-2 ml-4"
-
-                                            >
-
-                                                <Eye className="h-5 w-5" />
-
-                                                Test Modal
 
                                             </button>
 

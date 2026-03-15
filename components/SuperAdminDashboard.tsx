@@ -6,7 +6,7 @@ import { ticketAPI } from '../services/api';
 import { Users, Shield, Settings, Plus, Trash2, Edit, Search, CheckCircle, FileText, Clock, UserPlus, Filter, LayoutDashboard, BarChart2, PieChart as PieChartIcon, Lock, Save, Camera, Mail, Building, User as UserIcon, Eye, EyeOff, Hash, Calendar, BookOpen, XCircle, Check, ArrowUpRight, TrendingUp, ChevronRight, AlertTriangle, Power, AlertOctagon, Target, Award, Upload, Download, Briefcase, Activity, GraduationCap, Layers, Bell, UserX, MessageSquare, Paperclip } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Modal, Select, Toast, Pagination } from './UIComponents';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, Legend, LineChart, Line } from 'recharts';
-import Logo from '../assets/logo.jpg';
+import Logo from '../assets/logo.png';
 
 // --- Constants for Dropdowns ---
 const PROGRAM_OPTIONS = [

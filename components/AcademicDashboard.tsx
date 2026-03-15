@@ -7,7 +7,7 @@ import { Home, FileText, Settings, CheckCircle, Clock, AlertCircle, Search, User
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Modal, Select, Toast } from './UIComponents';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import Logo from '../assets/logo.jpg';
+import Logo from '../assets/logo.png';
 
 export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const { tickets, users, updateTicketStatus, updateTicketPriority, setTicketAppointment, addComment, updateUser } = useData();
