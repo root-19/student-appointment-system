@@ -74,7 +74,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const ticketsParams: any = {};
       if (currentUser.role === 'Student') {
         ticketsParams.user_id = currentUser.id;
+      } else if (currentUser.role === 'Registrar') {
+        ticketsParams.category = 'Registrar';
+      } else if (currentUser.role === 'Administrative') {
+        ticketsParams.category = 'Administrative';
+      } else if (currentUser.role === 'Academic') {
+        ticketsParams.category = 'Academic';
       }
+      // Admin and SuperAdmin see all tickets (no filtering)
       const ticketsData = await ticketAPI.getAll(ticketsParams);
       setTickets(ticketsData);
 
