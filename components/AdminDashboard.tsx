@@ -7,7 +7,6 @@ import { LayoutGrid, Ticket as TicketIcon, BarChart2, Settings, Search, Filter, 
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Modal, Select, Label, Toast, Pagination } from './UIComponents';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import Logo from '../assets/logo.png';
 
 export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const { tickets, users, updateTicketStatus, updateTicketPriority, setTicketAppointment, addComment, updateUser } = useData();
@@ -296,12 +295,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
         <aside className="w-72 bg-white border-r border-slate-200 hidden md:flex flex-col h-full fixed left-0 top-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
             <div className="p-8 flex items-center space-x-4 border-b border-slate-50">
                <div className="h-12 w-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-                <img
-                  src={Logo}
-                  alt="PTC Logo"
-                  className="mx-auto mb-4 h-20 w-auto"
-                />
-               </div>
+                </div>
                <div>
                  <span className="font-bold text-xl text-slate-900 block leading-none">Admin</span>
                  <span className="text-xs text-blue-600 font-bold tracking-widest mt-1 block">PORTAL</span>

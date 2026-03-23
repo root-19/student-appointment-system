@@ -7,7 +7,6 @@ import { Home, FileText, Settings, CheckCircle, Clock, AlertCircle, Search, User
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Modal, Select, Toast } from './UIComponents';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
-import Logo from '../assets/logo.png';
 
 export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => {
   const { tickets, users, updateTicketStatus, updateTicketPriority, setTicketAppointment, addComment, updateUser } = useData();
@@ -298,11 +297,6 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
         {/* ... Sidebar Content ... */}
         <div className="p-8 flex items-center space-x-4 border-b border-slate-50">
            <div className="h-12 w-12 bg-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200">
-               <img
-                 src={Logo}
-                 alt="PTC Logo"
-                 className="mx-auto mb-4 h-20 w-auto"
-               />
            </div>
            <div>
              <span className="font-bold text-xl text-slate-900 block leading-none">Academic</span>

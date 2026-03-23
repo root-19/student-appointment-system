@@ -1,9 +1,7 @@
-
 import React, { useState } from 'react';
 import { motion as m } from 'framer-motion';
 import { User, Lock, Mail } from 'lucide-react';
 import { Button, Input, Label } from './UIComponents';
-import Logo from '../assets/logo.png'
 
 // Cast motion to any to avoid TypeScript errors with initial/animate props in this environment
 const motion = m as any;
@@ -50,10 +48,10 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           >
              <div className="bg-white/10 p-6 rounded-3xl backdrop-blur-md border border-white/20 shadow-2xl">
                   <img
-    src={Logo}
-    alt="PTC Logo"
-    className="mx-auto mb-4 h-20 w-auto"
-  />
+                    src="/assets/logo.png"
+                    alt="PTC Logo"
+                    className="mx-auto mb-4 h-20 w-auto"
+                  />
              </div>
           </motion.div>
           <motion.div
@@ -91,26 +89,18 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
             transition={{ duration: 0.3 }}
             className="bg-white p-8 rounded-3xl shadow-2xl border border-slate-100"
           >
-            <div className="text-center mb-8">
-  {/* LOGO */}
-  <img
-    src={Logo}
-    alt="PTC Logo"
-    className="mx-auto mb-4 h-20 w-auto"
-  />
+            <div className="mb-6 text-center">
+              <div className="mx-auto mb-4 h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
+                <Lock className="h-8 w-8 text-blue-600" />
+              </div>
 
-  <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 mb-4 ring-8 ring-emerald-50/50">
-    <Lock className="h-7 w-7" />
-  </div>
-
-  <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-    Welcome Back
-  </h2>
-  <p className="mt-2 text-sm text-slate-600">
-    Sign in to access the Student Portal
-  </p>
-</div>
-
+              <h2 className="text-3xl font-bold tracking-tight text-slate-900">
+                Welcome Back
+              </h2>
+              <p className="mt-2 text-sm text-slate-600">
+                Sign in to access the Student Portal
+              </p>
+            </div>
 
             <form className="space-y-6" onSubmit={handleLoginSubmit}>
               <div>

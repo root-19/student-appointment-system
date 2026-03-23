@@ -12,7 +12,6 @@ import { ticketAPI } from '../services/api';
 
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Modal, Select, Toast } from './UIComponents';
 
-import Logo from '../assets/logo.png';
 
 
 
@@ -868,15 +867,7 @@ export const StudentDashboard: React.FC<DashboardProps> = ({ user, onLogout }) =
 
               <div className="h-12 w-12 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200">
 
-                 <img
 
-                   src={Logo}
-
-                   alt="PTC Logo"
-
-                   className="mx-auto mb-4 h-20 w-auto"
-
-                 />
 
               </div>
 
