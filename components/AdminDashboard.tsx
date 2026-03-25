@@ -295,7 +295,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
             <div className="p-8 flex items-center space-x-4 border-b border-slate-50">
                <div className="h-12 w-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
                 <img
-                  src="/assets/logo.png"
+                  src="./assets/logo.png"
                   alt="PTC Logo"
                   className="h-8 w-8 object-contain"
                 />

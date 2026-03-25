@@ -863,7 +863,7 @@ export const StudentDashboard: React.FC<DashboardProps> = ({ user, onLogout }) =
               <div className="h-12 w-12 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200">
 
                 <img
-                  src="/assets/logo.png"
+                  src="./assets/logo.png"
                   alt="PTC Logo"
                   className="h-8 w-8 object-contain"
                 />

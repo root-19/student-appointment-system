@@ -48,7 +48,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
           >
              <div className="bg-white/10 p-6 rounded-3xl backdrop-blur-md border border-white/20 shadow-2xl">
                   <img
-                    src="/assets/logo.png"
+                    src="./assets/logo.png"
                     alt="PTC Logo"
                     className="mx-auto mb-4 h-20 w-auto"
                   />

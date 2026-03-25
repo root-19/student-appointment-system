@@ -544,7 +544,7 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
         <div className="p-8 flex items-center space-x-3 border-b border-slate-800/50">
             <div className="h-10 w-10 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-900/50">
                 <img
-                  src="/assets/logo.png"
+                  src="./assets/logo.png"
                   alt="PTC Logo"
                   className="h-6 w-6 object-contain"
                 />
