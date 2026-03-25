@@ -297,6 +297,11 @@ export const RegistrarDashboard: React.FC<DashboardProps> = ({ user, onLogout })
         {/* ... Sidebar Content ... */}
         <div className="p-8 flex items-center space-x-4 border-b border-slate-50">
            <div className="h-12 w-12 bg-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-purple-200">
+                <img
+                  src="/assets/logo.png"
+                  alt="PTC Logo"
+                  className="h-8 w-8 object-contain"
+                />
            </div>
            <div>
              <span className="font-bold text-xl text-slate-900 block leading-none">Registrar</span>
@@ -1357,7 +1362,7 @@ export const RegistrarDashboard: React.FC<DashboardProps> = ({ user, onLogout })
                                  </form>
                              </CardContent>
                          </Card>
-                         
+
                          {/* Request Information */}
                          <Card className="border border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white">
                              <CardHeader className="bg-white border-b border-slate-50 p-4">

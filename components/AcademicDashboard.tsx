@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { DashboardProps, Ticket, User as UserType, TicketStatus, Priority } from '../types';
 import { useData } from '../context/DataContext';
@@ -12,13 +11,13 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
   const { tickets, users, updateTicketStatus, updateTicketPriority, setTicketAppointment, addComment, updateUser } = useData();
   const [view, setView] = useState('home');
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  
+
   // Ticket View State
   const [ticketSearchTerm, setTicketSearchTerm] = useState('');
   const [ticketFilterStatus, setTicketFilterStatus] = useState<'All' | 'Pending' | 'In Progress' | 'Resolved'>('All');
   const [priorityFilter, setPriorityFilter] = useState<string>('All');
   const [subcategoryFilter, setSubcategoryFilter] = useState<string>('All');
-  
+
   // Appointment State
   const [appointmentDate, setAppointmentDate] = useState('');
 
@@ -30,13 +29,13 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
   const [selectedStudent, setSelectedStudent] = useState<UserType | null>(null);
   const [searchStudent, setSearchStudent] = useState('');
   const [studentPage, setStudentPage] = useState(1);
-  const STUDENTS_PER_PAGE = 8; // Increased for table view
+  const STUDENTS_PER_PAGE = 8;
 
   // Comments
   const [commentText, setCommentText] = useState('');
   const [commentFile, setCommentFile] = useState<File | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
-  
+
   // Toast Notification
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error' | 'info'} | null>(null);
 
@@ -48,13 +47,13 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
     phone: '+63 917 999 8888',
     bio: 'Ensuring academic excellence and supporting student educational journeys.'
   });
-  
+
   const [passwords, setPasswords] = useState({
     current: '',
     new: '',
     confirm: ''
   });
-  
+
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -294,9 +293,13 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
 
       {/* Sidebar */}
       <aside className="w-72 bg-white border-r border-slate-200 hidden md:flex flex-col h-full fixed left-0 top-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-        {/* ... Sidebar Content ... */}
         <div className="p-8 flex items-center space-x-4 border-b border-slate-50">
            <div className="h-12 w-12 bg-orange-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-200">
+                <img
+                  src="/assets/logo.png"
+                  alt="PTC Logo"
+                  className="h-8 w-8 object-contain"
+                />
            </div>
            <div>
              <span className="font-bold text-xl text-slate-900 block leading-none">Academic</span>
@@ -1358,6 +1361,33 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
                              </CardContent>
                          </Card>
                          
+                         <Card className="border border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white">
+                             <CardHeader className="bg-white border-b border-slate-50 p-4">
+                                 <CardTitle className="text-sm font-bold text-slate-900 flex items-center">
+                                     <User className="h-4 w-4 mr-2 text-orange-600" />
+                                     Student Information
+                                 </CardTitle>
+                             </CardHeader>
+                             <CardContent className="p-4 space-y-3">
+                                 <div>
+                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Name</p>
+                                     <p className="text-sm font-semibold text-slate-900">{selectedTicket.studentName}</p>
+                                 </div>
+                                 <div>
+                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Student ID</p>
+                                     <p className="text-sm font-semibold text-slate-900">{selectedTicket.studentId || 'N/A'}</p>
+                                 </div>
+                                 <div>
+                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Email</p>
+                                     <p className="text-sm font-semibold text-slate-900">{selectedTicket.studentEmail || 'N/A'}</p>
+                                 </div>
+                                 <div>
+                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Submitted Date</p>
+                                     <p className="text-sm font-semibold text-slate-900">{selectedTicket.submittedDate}</p>
+                                 </div>
+                             </CardContent>
+                         </Card>
+
                          {/* Request Information */}
                          <Card className="border border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white">
                              <CardHeader className="bg-white border-b border-slate-50 p-4">

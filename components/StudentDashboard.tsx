@@ -12,9 +12,6 @@ import { ticketAPI } from '../services/api';
 
 import { Card, CardContent, CardHeader, CardTitle, Button, Input, Label, Badge, Modal, Select, Toast } from './UIComponents';
 
-
-
-
 // Cast motion to any to avoid TypeScript errors with initial/animate props in this environment
 
 const motion = m as any;
@@ -471,8 +468,6 @@ export const StudentDashboard: React.FC<DashboardProps> = ({ user, onLogout }) =
 
       });
 
-
-
       setCommentText('');
 
       setCommentFile(null);
@@ -867,7 +862,11 @@ export const StudentDashboard: React.FC<DashboardProps> = ({ user, onLogout }) =
 
               <div className="h-12 w-12 bg-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200">
 
-
+                <img
+                  src="/assets/logo.png"
+                  alt="PTC Logo"
+                  className="h-8 w-8 object-contain"
+                />
 
               </div>
 

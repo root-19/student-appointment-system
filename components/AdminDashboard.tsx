@@ -74,8 +74,7 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
   // --- Derived Data (Realtime) ---
 
   // 1. Stats - Filter specifically for Administrative tickets
-  // Show all tickets to avoid empty dashboard when no Administrative-only tickets
-  const adminTickets = tickets;
+  const adminTickets = tickets.filter(t => t.category === 'Administrative');
   const pendingCount = adminTickets.filter(t => t.status === 'Pending').length;
   const inProgressCount = adminTickets.filter(t => t.status === 'In Progress').length;
   const resolvedCount = adminTickets.filter(t => t.status === 'Resolved').length;
@@ -295,7 +294,12 @@ export const AdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }) => 
         <aside className="w-72 bg-white border-r border-slate-200 hidden md:flex flex-col h-full fixed left-0 top-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
             <div className="p-8 flex items-center space-x-4 border-b border-slate-50">
                <div className="h-12 w-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200">
-                </div>
+                <img
+                  src="/assets/logo.png"
+                  alt="PTC Logo"
+                  className="h-8 w-8 object-contain"
+                />
+               </div>
                <div>
                  <span className="font-bold text-xl text-slate-900 block leading-none">Admin</span>
                  <span className="text-xs text-blue-600 font-bold tracking-widest mt-1 block">PORTAL</span>

@@ -36,6 +36,8 @@ export interface Ticket {
   description: string;
   submittedBy: string; // User ID
   studentName: string;
+  studentId?: string;
+  studentEmail?: string;
   submittedDate: string;
   lastUpdated: string;
   comments: Comment[];
