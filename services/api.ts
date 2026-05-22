@@ -42,6 +42,19 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
+  sendOTP: async (email: string): Promise<{ message: string; otp?: string }> => {
+    const response = await api.post('/send-otp', { email });
+    console.log('Send OTP response:', response.data);
+    return response.data;
+  },
+
+  verifyOTP: async (email: string, otp: string): Promise<{ user: User; token: string }> => {
+    const response = await api.post('/verify-otp', { email, otp });
+    localStorage.setItem('auth_token', response.data.token);
+    localStorage.setItem('ticket_sys_user', JSON.stringify(response.data.user));
+    return response.data;
+  },
+
   login: async (email: string): Promise<{ user: User; token: string }> => {
     const response = await api.post('/login', { email });
     localStorage.setItem('auth_token', response.data.token);

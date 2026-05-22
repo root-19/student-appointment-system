@@ -20,8 +20,9 @@ interface DataContextType {
   pendingRegistrations: RegistrationRequest[];
   loading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
+  sendOTP: (email: string) => Promise<{ message: string; otp?: string }>;
+  verifyOTP: (email: string, otp: string) => Promise<boolean>;
   logout: () => Promise<void>;
-  addTicket: (ticket: NewTicketInput) => Promise<void>;
   updateTicketStatus: (ticketId: string, status: Ticket['status']) => Promise<void>;
   updateTicketPriority: (ticketId: string, priority: Priority) => Promise<void>;
   setTicketAppointment: (ticketId: string, date: string, time: string) => Promise<void>;
@@ -131,6 +132,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const message = error.response?.data?.message || error.message || 'Invalid email.';
       alert(message);
       return false;
+    }
+  };
+
+  const sendOTP = async (email: string): Promise<{ message: string; otp?: string }> => {
+    try {
+      const result = await authAPI.sendOTP(email);
+      return result;
+    } catch (error: any) {
+      console.error('Send OTP error:', error);
+      const message = error.response?.data?.message || error.message || 'Failed to send OTP.';
+      throw new Error(message);
+    }
+  };
+
+  const verifyOTP = async (email: string, otp: string): Promise<boolean> => {
+    try {
+      const { user, token } = await authAPI.verifyOTP(email, otp);
+
+      if (user.status === 'Inactive') {
+        alert("Your account has been deactivated. Please contact the administrator.");
+        return false;
+      }
+
+      setCurrentUser(user);
+      return true;
+    } catch (error: any) {
+      console.error('Verify OTP error:', error);
+      const message = error.response?.data?.message || error.message || 'Invalid or expired OTP.';
+      throw new Error(message);
     }
   };
 
@@ -347,9 +377,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <DataContext.Provider value={{ 
+    <DataContext.Provider value={{
       currentUser, users, tickets, documents, pendingRegistrations, notifications, loading,
-      login, logout, addTicket, updateTicketStatus, updateTicketPriority, setTicketAppointment, addComment, addDocument, 
+      login, sendOTP, verifyOTP, logout, addTicket, updateTicketStatus, updateTicketPriority, setTicketAppointment, addComment, addDocument,
       addUser, updateUser, deleteUser,
       registerUser, approveRegistration, rejectRegistration,
       markNotificationAsRead, clearAllNotifications, refreshData

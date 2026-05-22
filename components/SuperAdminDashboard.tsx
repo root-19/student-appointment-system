@@ -198,6 +198,43 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
       return acc;
   }, {} as Record<string, number>);
 
+  // Daily Performance Insights
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  const todayTickets = tickets.filter(t => {
+    const ticketDate = new Date(t.submittedDate).toISOString().split('T')[0];
+    return ticketDate === today;
+  });
+
+  const yesterdayTickets = tickets.filter(t => {
+    const ticketDate = new Date(t.submittedDate).toISOString().split('T')[0];
+    return ticketDate === yesterday;
+  });
+
+  const todayResolved = todayTickets.filter(t => t.status === 'Resolved').length;
+  const yesterdayResolved = yesterdayTickets.filter(t => t.status === 'Resolved').length;
+
+  const dailyResolutionRate = todayTickets.length > 0 ? Math.round((todayResolved / todayTickets.length) * 100) : 0;
+
+  // Calculate average response time
+  const getAverageResponseTime = (ticketList: Ticket[]) => {
+    const responseTimes = ticketList
+      .filter(t => t.status !== 'Pending' && t.lastUpdated)
+      .map(t => {
+        const submitted = new Date(t.submittedDate).getTime();
+        const updated = new Date(t.lastUpdated).getTime();
+        return Math.round((updated - submitted) / (1000 * 60));
+      });
+    return responseTimes.length > 0 ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) : 0;
+  };
+
+  const avgResponseTimeToday = getAverageResponseTime(todayTickets);
+  const avgResponseTimeYesterday = getAverageResponseTime(yesterdayTickets);
+
+  const ticketChange = todayTickets.length - yesterdayTickets.length;
+  const resolvedChange = todayResolved - yesterdayResolved;
+
   const PIE_DATA = [
       { name: 'Resolved', value: statusCounts['Resolved'] || 0, color: '#10b981' }, // Emerald
       { name: 'In Progress', value: statusCounts['In Progress'] || 0, color: '#3b82f6' }, // Blue
@@ -1001,13 +1038,48 @@ export const SuperAdminDashboard: React.FC<DashboardProps> = ({ user, onLogout }
             {/* Analytics View */}
             {view === 'analytics' && (
                  <div className="space-y-8 pb-10">
+                    {/* Daily Performance Insights */}
+                    <div className="bg-gradient-to-r from-purple-600 to-purple-700 rounded-2xl p-6 text-white">
+                        <div className="flex items-center gap-3 mb-4">
+                            <Activity className="h-6 w-6" />
+                            <h2 className="text-xl font-bold">Daily Performance Insights</h2>
+                            <span className="text-xs bg-white/20 px-3 py-1 rounded-full">{today}</span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                                <p className="text-purple-100 text-sm font-medium mb-1">Today's Tickets</p>
+                                <p className="text-3xl font-bold">{todayTickets.length}</p>
+                                <p className={`text-xs mt-1 ${ticketChange >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                    {ticketChange >= 0 ? '+' : ''}{ticketChange} from yesterday
+                                </p>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                                <p className="text-purple-100 text-sm font-medium mb-1">Resolved Today</p>
+                                <p className="text-3xl font-bold">{todayResolved}</p>
+                                <p className={`text-xs mt-1 ${resolvedChange >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                    {resolvedChange >= 0 ? '+' : ''}{resolvedChange} from yesterday
+                                </p>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                                <p className="text-purple-100 text-sm font-medium mb-1">Daily Resolution Rate</p>
+                                <p className="text-3xl font-bold">{dailyResolutionRate}%</p>
+                                <p className="text-xs text-purple-200 mt-1">Today's efficiency</p>
+                            </div>
+                            <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                                <p className="text-purple-100 text-sm font-medium mb-1">Avg Response Time</p>
+                                <p className="text-3xl font-bold">{avgResponseTimeToday}m</p>
+                                <p className="text-xs text-purple-200 mt-1">Average time to respond</p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div className="flex items-center justify-between">
                          <div>
                             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">System Analytics</h1>
                             <p className="text-slate-500 mt-1">Deep insights into system performance and user engagement.</p>
                          </div>
                          <div className="flex space-x-2">
-                             <Select 
+                             <Select
                                 value={dateRange}
                                 onChange={(e) => setDateRange(e.target.value)}
                                 className="h-10 w-40 text-sm bg-white border-slate-200 rounded-lg shadow-sm"

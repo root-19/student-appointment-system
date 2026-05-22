@@ -142,7 +142,43 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
   // 4. Analytics Data
   const totalTickets = academicTickets.length;
   const resolutionRate = totalTickets > 0 ? Math.round((resolvedCount / totalTickets) * 100) : 0;
-  
+
+  // Daily Performance Insights
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+
+  const todayTickets = academicTickets.filter(t => {
+    const ticketDate = new Date(t.submittedDate).toISOString().split('T')[0];
+    return ticketDate === today;
+  });
+
+  const yesterdayTickets = academicTickets.filter(t => {
+    const ticketDate = new Date(t.submittedDate).toISOString().split('T')[0];
+    return ticketDate === yesterday;
+  });
+
+  const todayResolved = todayTickets.filter(t => t.status === 'Resolved').length;
+  const yesterdayResolved = yesterdayTickets.filter(t => t.status === 'Resolved').length;
+
+  const dailyResolutionRate = todayTickets.length > 0 ? Math.round((todayResolved / todayTickets.length) * 100) : 0;
+
+  const getAverageResponseTime = (ticketList: Ticket[]) => {
+    const responseTimes = ticketList
+      .filter(t => t.status !== 'Pending' && t.lastUpdated)
+      .map(t => {
+        const submitted = new Date(t.submittedDate).getTime();
+        const updated = new Date(t.lastUpdated).getTime();
+        return Math.round((updated - submitted) / (1000 * 60));
+      });
+    return responseTimes.length > 0 ? Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length) : 0;
+  };
+
+  const avgResponseTimeToday = getAverageResponseTime(todayTickets);
+  const avgResponseTimeYesterday = getAverageResponseTime(yesterdayTickets);
+
+  const ticketChange = todayTickets.length - yesterdayTickets.length;
+  const resolvedChange = todayResolved - yesterdayResolved;
+
   const STATUS_DATA = [
     { name: 'Resolved', value: resolvedCount, color: '#10b981' },
     { name: 'In Progress', value: inProgressCount, color: '#3b82f6' },
@@ -518,6 +554,41 @@ export const AcademicDashboard: React.FC<DashboardProps> = ({ user, onLogout }) 
           {view === 'analytics' && (
               // ... Analytics View ...
               <div className="space-y-10 max-w-7xl mx-auto">
+                  {/* Daily Performance Insights */}
+                  <div className="bg-gradient-to-r from-orange-600 to-orange-700 rounded-2xl p-6 text-white">
+                      <div className="flex items-center gap-3 mb-4">
+                          <Activity className="h-6 w-6" />
+                          <h2 className="text-xl font-bold">Daily Performance Insights</h2>
+                          <span className="text-xs bg-white/20 px-3 py-1 rounded-full">{today}</span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                              <p className="text-orange-100 text-sm font-medium mb-1">Today's Tickets</p>
+                              <p className="text-3xl font-bold">{todayTickets.length}</p>
+                              <p className={`text-xs mt-1 ${ticketChange >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                  {ticketChange >= 0 ? '+' : ''}{ticketChange} from yesterday
+                              </p>
+                          </div>
+                          <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                              <p className="text-orange-100 text-sm font-medium mb-1">Resolved Today</p>
+                              <p className="text-3xl font-bold">{todayResolved}</p>
+                              <p className={`text-xs mt-1 ${resolvedChange >= 0 ? 'text-emerald-300' : 'text-red-300'}`}>
+                                  {resolvedChange >= 0 ? '+' : ''}{resolvedChange} from yesterday
+                              </p>
+                          </div>
+                          <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                              <p className="text-orange-100 text-sm font-medium mb-1">Daily Resolution Rate</p>
+                              <p className="text-3xl font-bold">{dailyResolutionRate}%</p>
+                              <p className="text-xs text-orange-200 mt-1">Today's efficiency</p>
+                          </div>
+                          <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                              <p className="text-orange-100 text-sm font-medium mb-1">Avg Response Time</p>
+                              <p className="text-3xl font-bold">{avgResponseTimeToday}m</p>
+                              <p className="text-xs text-orange-200 mt-1">Average time to respond</p>
+                          </div>
+                      </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
                       <Card className="bg-white border border-slate-200 shadow-sm rounded-2xl hover:shadow-lg transition-all p-8 flex items-center justify-between">
                             <div>

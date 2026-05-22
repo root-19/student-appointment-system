@@ -8,26 +8,65 @@ const motion = m as any;
 
 interface LoginProps {
   onLogin: (email: string) => Promise<boolean>;
+  onSendOTP?: (email: string) => Promise<{ message: string; otp?: string }>;
+  onVerifyOTP?: (email: string, otp: string) => Promise<boolean>;
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onSendOTP, onVerifyOTP }) => {
   // Login State
   const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<'email' | 'otp'>('email');
+  const [message, setMessage] = useState('');
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setMessage('');
     try {
-      const success = await onLogin(email);
-      if (!success) {
-        // Error is already handled in onLogin
+      if (onSendOTP) {
+        const result = await onSendOTP(email);
+        console.log('OTP result:', result);
+        setStep('otp');
+        setMessage(result?.message || 'OTP sent to your email. Please check your inbox.');
+      } else {
+        const success = await onLogin(email);
+        if (!success) {
+          // Error is already handled in onLogin
+        }
       }
-    } catch (error) {
-      console.error('Login error:', error);
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Failed to send OTP. Please try again.');
+      console.error('OTP send error:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+    try {
+      if (onVerifyOTP) {
+        const success = await onVerifyOTP(email, otp);
+        if (!success) {
+          setMessage('Invalid OTP. Please try again.');
+        }
+      }
+    } catch (error: any) {
+      setMessage(error.response?.data?.message || 'Invalid or expired OTP.');
+      console.error('OTP verify error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleBackToEmail = () => {
+    setStep('email');
+    setOtp('');
+    setMessage('');
   };
 
   return (
@@ -95,35 +134,68 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
               </div>
 
               <h2 className="text-3xl font-bold tracking-tight text-slate-900">
-                Welcome Back
+                {step === 'email' ? 'Welcome Back' : 'Verify OTP'}
               </h2>
               <p className="mt-2 text-sm text-slate-600">
-                Sign in to access the Student Portal
+                {step === 'email' ? 'Sign in to access the Student Portal' : 'Enter the 6-digit code sent to your email'}
               </p>
             </div>
 
-            <form className="space-y-6" onSubmit={handleLoginSubmit}>
-              <div>
-                <Label htmlFor="email" className="text-black font-bold mb-1.5 block">Email address</Label>
-                <div className="relative mt-1">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-slate-400" />
+            <form className="space-y-6" onSubmit={step === 'email' ? handleSendOTP : handleVerifyOTP}>
+              {step === 'email' ? (
+                <div>
+                  <Label htmlFor="email" className="text-black font-bold mb-1.5 block">Email address</Label>
+                  <div className="relative mt-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <Input
+                      id="email"
+                      type="email"
+                      required
+                      className="pl-10 h-11 bg-slate-50 focus:bg-white transition-colors text-black"
+                      placeholder="student@ptc.edu.ph"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
                   </div>
-                  <Input
-                    id="email"
-                    type="email"
-                    required
-                    className="pl-10 h-11 bg-slate-50 focus:bg-white transition-colors text-black"
-                    placeholder="student@ptc.edu.ph"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
                 </div>
-              </div>
+              ) : (
+                <div>
+                  <Label htmlFor="otp" className="text-black font-bold mb-1.5 block">Enter OTP</Label>
+                  <div className="relative mt-1">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-slate-400" />
+                    </div>
+                    <Input
+                      id="otp"
+                      type="text"
+                      required
+                      maxLength={6}
+                      className="pl-10 h-11 bg-slate-50 focus:bg-white transition-colors text-black"
+                      placeholder="123456"
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleBackToEmail}
+                    className="mt-2 text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    ← Back to email
+                  </button>
+                </div>
+              )}
 
+              {message && (
+                <div className={`p-3 rounded-lg text-sm ${message.includes('sent') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+                  {message}
+                </div>
+              )}
 
               <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800 h-11 text-base shadow-lg shadow-slate-900/20" disabled={loading}>
-                {loading ? 'Signing in...' : 'Sign In'}
+                {loading ? (step === 'email' ? 'Sending OTP...' : 'Verifying...') : (step === 'email' ? 'Send OTP' : 'Verify OTP')}
               </Button>
             </form>
           </motion.div>

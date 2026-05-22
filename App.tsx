@@ -9,15 +9,24 @@ import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { DataProvider, useData } from './context/DataContext';
 
 const AppContent: React.FC = () => {
-  const { currentUser, login, logout } = useData();
+  const { currentUser, login, sendOTP, verifyOTP, logout } = useData();
 
   const handleLogin = async (email: string, password: string) => {
     const success = await login(email, password);
     return success;
   };
 
+  const handleSendOTP = async (email: string) => {
+    return await sendOTP(email);
+  };
+
+  const handleVerifyOTP = async (email: string, otp: string) => {
+    const success = await verifyOTP(email, otp);
+    return success;
+  };
+
   if (!currentUser) {
-    return <Login onLogin={handleLogin} />;
+    return <Login onLogin={handleLogin} onSendOTP={handleSendOTP} onVerifyOTP={handleVerifyOTP} />;
   }
 
   // Role-based Routing
