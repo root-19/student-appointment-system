@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import { User, Ticket, Document, Notification, RegistrationRequest, Comment } from '../types';
 
-const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://student-appo-production.up.railway.app/api';
+const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || 'https://school.cateringreservation.com.mx/api';
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
